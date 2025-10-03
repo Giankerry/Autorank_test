@@ -1,3 +1,4 @@
+{{-- Manage Users: Faculty Ranks Table Row Loader --}}
 <tr id="user-row-{{ $user->id }}">
     <td>{{ $user->id }}</td>
     <td>{{ $user->name }}</td>
@@ -6,9 +7,7 @@
         {{ $user->faculty_rank ?? 'N/A' }}
     </td>
     <td>
-        {{ $user->rank_assigned_at 
-            ? \Carbon\Carbon::parse($user->rank_assigned_at)->timezone('Asia/Manila')->format('m/d/y H:i') 
-            : 'N/A' }}
+        {{ $user->rank_assigned_at?->timezone('Asia/Manila')->format('m/d/y H:i') ?? 'N/A' }}
     </td>
     <td id="rank-assigned-by-{{ $user->id }}">
         {{ $user->rank_assigned_by ?? 'N/A' }}

@@ -237,7 +237,7 @@ class InstructionController extends Controller
         }
         try {
             if ($instruction->google_drive_file_id) {
-                $this->deleteFileFromGoogleDrive($instruction->google_drive_file_id);
+                $this->deleteFileFromGoogleDrive($instruction->google_drive_file_id, $instruction->user);
             }
             $instruction->delete();
             return response()->json(['message' => 'Item deleted successfully.']);
@@ -255,34 +255,31 @@ class InstructionController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        if (!$instruction->google_drive_file_id) {
-            return response()->json(['message' => 'No file associated with this record.'], 404);
+        $filesData = [];
+        if ($instruction->google_drive_file_id) {
+            $filesData[] = [
+                'file_name' => $instruction->proof_filename ?? 'Download File',
+                'file_url'  => route('instructor.instruction.view-file', ['id' => $id]),
+            ];
         }
 
-        $viewUrl = route('instructor.instruction.view-file', ['id' => $id]);
-
-        // Get the standard file info from the trait
-        $fileInfoResponse = $this->getFileInfoById($instruction->google_drive_file_id, $viewUrl);
-        $fileInfoData = $fileInfoResponse->getData(true);
-
-        // Get the formatted record data from our new helper method
         $recordData = $this->formatRecordDataForViewer($instruction);
 
-        // Merge them and return a new JSON response
-        $responseData = array_merge($fileInfoData, ['recordData' => $recordData]);
-
-        return response()->json($responseData);
+        // UPDATED: Return the new JSON format
+        return response()->json([
+            'success' => true,
+            'files'   => $filesData,
+            'details' => $recordData,
+        ]);
     }
 
     public function viewFile($id, Request $request)
     {
-        $instruction = Instruction::findOrFail($id);
-
+        $instruction = Instruction::with('user')->findOrFail($id);
         if ($instruction->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+            abort(403, 'Unauthorized');
         }
-
-        return $this->viewFileById($instruction->google_drive_file_id, $request);
+        return $this->viewFileById($instruction->google_drive_file_id, $request, $instruction->user);
     }
 
     /**
@@ -307,7 +304,6 @@ class InstructionController extends Controller
                 $data['Publication Date'] = Carbon::parse($instruction->publication_date)->format('F j, Y');
                 $data['Score'] = $instruction->score !== null ? number_format($instruction->score, 2) : 'To be evaluated';
                 break;
-
             case 'mentorship-services':
                 $data = [
                     'Service Type' => $instruction->service_type,
@@ -319,7 +315,6 @@ class InstructionController extends Controller
                 ];
                 break;
         }
-
         $data['Date Uploaded'] = $instruction->created_at->format('F j, Y, g:i A');
         return $data;
     }

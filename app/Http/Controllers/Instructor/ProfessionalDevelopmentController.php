@@ -225,7 +225,8 @@ class ProfessionalDevelopmentController extends Controller
         }
         try {
             if ($professionalDevelopment->google_drive_file_id) {
-                $this->deleteFileFromGoogleDrive($professionalDevelopment->google_drive_file_id);
+                // UPDATED: Pass the file's owner to the trait method
+                $this->deleteFileFromGoogleDrive($professionalDevelopment->google_drive_file_id, $professionalDevelopment->user);
             }
             $professionalDevelopment->delete();
             return response()->json(['message' => 'Item deleted successfully.']);
@@ -237,7 +238,7 @@ class ProfessionalDevelopmentController extends Controller
 
     public function getFileInfo($id)
     {
-        $professionalDevelopment = ProfessionalDevelopment::findOrFail($id);
+        $professionalDevelopment = ProfessionalDevelopment::with('user')->findOrFail($id);
 
         if ($professionalDevelopment->user_id !== Auth::id()) {
             return response()->json(['message' => 'Unauthorized'], 403);
@@ -247,27 +248,37 @@ class ProfessionalDevelopmentController extends Controller
             return response()->json(['message' => 'No file associated with this record.'], 404);
         }
 
-        $viewUrl = route('instructor.professional-development.view-file', ['id' => $id]);
+        try {
+            // Authenticate as the file owner to get the MIME type
+            $service = $this->getGoogleDriveService($professionalDevelopment->user);
+            $file = $service->files->get($professionalDevelopment->google_drive_file_id, ['fields' => 'mimeType']);
+            $isViewable = in_array($file->getMimeType(), ['application/pdf', 'image/jpeg', 'image/png']);
 
-        $fileInfoResponse = $this->getFileInfoById($professionalDevelopment->google_drive_file_id, $viewUrl);
-        $fileInfoData = $fileInfoResponse->getData(true);
+            // Build the URL to the streaming endpoint
+            $viewUrl = route('instructor.professional-development.view-file', ['id' => $id]);
+            // Format the local record data
+            $recordData = $this->formatRecordDataForViewer($professionalDevelopment);
 
-        $recordData = $this->formatRecordDataForViewer($professionalDevelopment);
+            // Merge into the original JSON structure the script expects
+            $responseData = array_merge(['isViewable' => $isViewable, 'viewUrl' => $viewUrl], ['recordData' => $recordData]);
 
-        $responseData = array_merge($fileInfoData, ['recordData' => $recordData]);
-
-        return response()->json($responseData);
+            return response()->json($responseData);
+        } catch (\Exception $e) {
+            Log::error('Instructor getFileInfo for Professional Development failed: ' . $e->getMessage());
+            return response()->json(['message' => 'Could not retrieve file information.'], 500);
+        }
     }
 
     public function viewFile($id, Request $request)
     {
-        $professionalDevelopment = ProfessionalDevelopment::findOrFail($id);
+        $professionalDevelopment = ProfessionalDevelopment::with('user')->findOrFail($id);
 
         if ($professionalDevelopment->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+            abort(403, 'Unauthorized');
         }
 
-        return $this->viewFileById($professionalDevelopment->google_drive_file_id, $request);
+        // UPDATED: Pass the file's owner to the trait method
+        return $this->viewFileById($professionalDevelopment->google_drive_file_id, $request, $professionalDevelopment->user);
     }
 
     /**

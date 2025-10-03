@@ -1,3 +1,4 @@
+{{-- KRA I: Thesis, Dissertation, & Mentorship Table Row Loader --}}
 <tr data-id="{{ $item->id }}">
     <td>{{ $item->id }}</td>
     <td>{{ $item->service_type }}</td>

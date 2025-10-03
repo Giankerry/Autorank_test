@@ -52,7 +52,7 @@
     overflow-x: auto;
     width: 100vw;
     height: auto;
-    display: flex;
+    display: block;
     flex-direction: column;
     gap: 20px;
 }

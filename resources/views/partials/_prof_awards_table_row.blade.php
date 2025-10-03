@@ -1,3 +1,4 @@
+{{-- KRA IV: Awards and Recognitions Table Row Loader --}}
 <tr data-id="{{ $item->id }}">
     <td>{{ $item->id }}</td>
     <td>{{ $item->title }}</td>

@@ -1,3 +1,4 @@
+{{-- KRA I: Instructional Materials Table Row Loader --}}
 <tr data-id="{{ $item->id }}">
     <td>{{ $item->id }}</td>
     <td>{{ $item->title }}</td>
@@ -8,10 +9,8 @@
     </td>
     <td>
         <div class="action-buttons">
-            <button
-                class="btn btn-info view-file-btn"
-                data-info-url="{{ route('instructor.instruction.file-info', ['id' => $item->id]) }}"
-                data-filename="{{ $item->proof_filename }}">
+            <button type="button" class="btn btn-secondary btn-sm view-file-btn" 
+                data-info-url="{{ route('instructor.instruction.file-info', ['id' => $item->id]) }}">
                 View File
             </button>
             <button

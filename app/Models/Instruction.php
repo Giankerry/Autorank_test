@@ -29,6 +29,14 @@ class Instruction extends Model
     ];
 
     /**
+     * Get the user that owns the instruction record.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
      * Get the application that this instruction submission belongs to.
      */
     public function application(): BelongsTo

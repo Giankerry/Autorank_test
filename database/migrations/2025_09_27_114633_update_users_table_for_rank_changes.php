@@ -8,12 +8,14 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
-        // Rename ahp_score → general_score
-        DB::statement("ALTER TABLE users CHANGE ahp_score general_score DOUBLE");
-
         Schema::table('users', function (Blueprint $table) {
             // Drop the old rank column
             $table->dropColumn('rank');
+
+            // Rename ahp_score to general_score
+            if (Schema::hasColumn('users', 'ahp_score')) {
+                $table->renameColumn('ahp_score', 'general_score');
+            }
 
             // Ensure faculty_rank exists and default is "Unset"
             if (!Schema::hasColumn('users', 'faculty_rank')) {
@@ -30,10 +32,11 @@ return new class extends Migration {
 
     public function down(): void
     {
-        // Rollback changes
-        DB::statement("ALTER TABLE users CHANGE general_score ahp_score DOUBLE");
-
         Schema::table('users', function (Blueprint $table) {
+            if (Schema::hasColumn('users', 'general_score')) {
+                $table->renameColumn('general_score', 'ahp_score');
+            }
+
             // Recreate rank column
             $table->string('rank')->nullable()->after('instructor_number');
 

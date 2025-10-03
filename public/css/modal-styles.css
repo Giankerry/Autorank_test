@@ -314,6 +314,7 @@ select {
     flex-direction: column;
     border-radius: 2.5%;
     padding: 25px;
+    color: white;
 }
 
 .confirmation-modal-header, .confirmation-modal-body, .confirmation-modal-actions {
@@ -375,7 +376,7 @@ select {
     gap: 7px;
 }
 
-.confirmation-modal-title, #confirmationModalText, #confirmation-final-status-message-area {
+.confirmation-modal-title, #confirmationModalText, #confirmation-final-status-message-area, #score-modal-form {
     width: 100%;
     height: auto;
 }

@@ -251,7 +251,8 @@ class ResearchController extends Controller
         }
         try {
             if ($research->google_drive_file_id) {
-                $this->deleteFileFromGoogleDrive($research->google_drive_file_id);
+                // UPDATED: Pass the file's owner to the trait method
+                $this->deleteFileFromGoogleDrive($research->google_drive_file_id, $research->user);
             }
             $research->delete();
             return response()->json(['message' => 'Item deleted successfully.']);
@@ -263,7 +264,7 @@ class ResearchController extends Controller
 
     public function getFileInfo($id)
     {
-        $research = Research::findOrFail($id);
+        $research = Research::with('user')->findOrFail($id);
 
         if ($research->user_id !== Auth::id()) {
             return response()->json(['message' => 'Unauthorized'], 403);
@@ -273,49 +274,44 @@ class ResearchController extends Controller
             return response()->json(['message' => 'No file associated with this record.'], 404);
         }
 
-        $viewUrl = route('instructor.research.view-file', ['id' => $id]);
+        try {
+            // Replicate the original logic but with the correct authentication
+            $service = $this->getGoogleDriveService($research->user);
+            $file = $service->files->get($research->google_drive_file_id, ['fields' => 'mimeType']);
+            $isViewable = in_array($file->getMimeType(), ['application/pdf', 'image/jpeg', 'image/png']);
 
-        // Get the standard file info from the trait
-        $fileInfoResponse = $this->getFileInfoById($research->google_drive_file_id, $viewUrl);
-        $fileInfoData = $fileInfoResponse->getData(true);
+            $viewUrl = route('instructor.research.view-file', ['id' => $id]);
+            $recordData = $this->formatRecordDataForViewer($research);
 
-        // Get the formatted record data from our new helper method
-        $recordData = $this->formatRecordDataForViewer($research);
+            // Return the original JSON structure the instructor-side script expects
+            $responseData = array_merge(['isViewable' => $isViewable, 'viewUrl' => $viewUrl], ['recordData' => $recordData]);
 
-        // Merge them and return a new JSON response
-        $responseData = array_merge($fileInfoData, ['recordData' => $recordData]);
-
-        return response()->json($responseData);
+            return response()->json($responseData);
+        } catch (\Exception $e) {
+            Log::error('Instructor getFileInfo for Research failed: ' . $e->getMessage());
+            return response()->json(['message' => 'Could not retrieve file information.'], 500);
+        }
     }
 
     public function viewFile($id, Request $request)
     {
-        $research = Research::findOrFail($id);
+        $research = Research::with('user')->findOrFail($id);
 
         if ($research->user_id !== Auth::id()) {
-            return response()->json(['message' => 'Unauthorized'], 403);
+            abort(403, 'Unauthorized');
         }
 
-        return $this->viewFileById($research->google_drive_file_id, $request);
+        // UPDATED: Pass the file's owner to the trait method
+        return $this->viewFileById($research->google_drive_file_id, $request, $research->user);
     }
 
-    /**
-     * Formats a Research record's data into a human-readable array for the file viewer.
-     *
-     * @param \App\Models\Research $research
-     * @return array
-     */
     private function formatRecordDataForViewer(Research $research): array
     {
+        // ... (This helper method is unchanged)
         $data = [];
         switch ($research->criterion) {
             case 'research-outputs':
-                $data = [
-                    'Title' => $research->title,
-                    'Category' => $research->category,
-                    'Role' => $research->role,
-                    'Publication / Journal Name' => $research->journal_name,
-                ];
+                $data = ['Title' => $research->title, 'Category' => $research->category, 'Role' => $research->role, 'Publication / Journal Name' => $research->journal_name,];
                 if ($research->indexing) {
                     $data['Indexing'] = $research->indexing;
                 }
@@ -325,20 +321,10 @@ class ResearchController extends Controller
                 $data['Publication Date'] = \Carbon\Carbon::parse($research->publication_date)->format('F j, Y');
                 $data['Score'] = $research->score !== null ? number_format($research->score, 2) : 'To be evaluated';
                 break;
-
             case 'inventions-creative-works':
-                $data = [
-                    'Title' => $research->title,
-                    'Type' => $research->type,
-                    'Sub-Type' => $research->sub_type,
-                    'Role' => $research->role,
-                    'Status / Level' => $research->status_level,
-                    'Date of Issue / Exhibition' => \Carbon\Carbon::parse($research->exhibition_date)->format('F j, Y'),
-                    'Score' => $research->score !== null ? number_format($research->score, 2) : 'To be evaluated',
-                ];
+                $data = ['Title' => $research->title, 'Type' => $research->type, 'Sub-Type' => $research->sub_type, 'Role' => $research->role, 'Status / Level' => $research->status_level, 'Date of Issue / Exhibition' => \Carbon\Carbon::parse($research->exhibition_date)->format('F j, Y'), 'Score' => $research->score !== null ? number_format($research->score, 2) : 'To be evaluated',];
                 break;
         }
-
         $data['Date Uploaded'] = $research->created_at->format('F j, Y, g:i A');
         return $data;
     }

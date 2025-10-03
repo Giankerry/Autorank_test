@@ -249,15 +249,6 @@
     );
 }
 
-/* PERFORMANCE METRICS STYLING -- -- */
-.credentials-container {
-    width: 100%;
-    height: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 35px;
-}
-
 /* TOAST STYLING */
 .toast-container {
     position: fixed;
@@ -280,83 +271,6 @@
 .toast-container.show {
     opacity: 1;
     visibility: visible;
-}
-
-/* DATA DISPLAY TABLE STYLING -- -- -- */
-.credentials-table-container {
-    overflow-x: auto;
-    width: 100%;
-    height: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.credentials-table-container table {
-    background-color: var(--tableBackgroundColor);
-    width: 100%;
-    height: auto;
-    border-collapse: collapse;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.credentials-table-container table th {
-    border-bottom: 2px solid var(--primaryColor);
-    background-color: var(--primaryColor);
-    color: white;
-    padding: var(--tableHeaderPadding);
-    font-weight: 500;
-}
-
-.credentials-table-container table td {
-    border-left: 2px solid var(--tableDataBorderColor);
-    border-right: 2px solid var(--tableDataBorderColor);
-    border-bottom: 2px solid var(--tableDataBorderColor);
-    padding: var(--tableDataPadding);
-    text-align: center;
-    font-weight: 500;
-    color: white;
-}
-
-.credentials-table-container table td div {
-    width: auto;
-    height: auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 15px;
-}
-
-.credentials-table-container table td a {
-    width: auto;
-    height: auto;
-}
-
-.credentials-table-container table td button {
-    background-color: hsl(
-    var(--base-hue-primary),
-    var(--base-saturation-primary),
-    calc(var(--base-lightness-primary) + 15%)
-    );
-    border: none;
-    border-radius: 5px;
-    width: auto;
-    min-height: 35px;
-    font-size: 1.1rem;
-    font-weight: 500;
-    justify-self: center;
-    padding-left: 15px;
-    padding-right: 15px;
-}
-
-.credentials-table-container table td button:hover {
-    cursor: pointer;
-    background-color: hsl(
-    var(--base-hue-primary),
-    var(--base-saturation-primary),
-    calc(var(--base-lightness-primary) + 25%)
-    );
 }
 
 /* LOAD MORE STYLING -- -- -- */
@@ -395,4 +309,29 @@
     var(--base-saturation-primary),
     calc(var(--base-lightness-primary) + 25%)
     );
+}
+
+/* START EVAL CYCLE STYLING -- -- -- */
+.missing-kra-list {
+    list-style-type: none;
+    padding-left: 0;
+    margin-top: 1rem;
+}
+
+.missing-kra-list {
+    margin-bottom: -2rem;
+}
+
+.missing-kra-list li {
+    margin-bottom: 0.5rem;
+}
+
+.missing-kra-list li a {
+    text-decoration: none;
+    color: var(--primary-color, #3F51B5);
+    font-weight: 500;
+}
+
+.missing-kra-list li a:hover {
+    text-decoration: underline;
 }

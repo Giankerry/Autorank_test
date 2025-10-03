@@ -1,56 +1,47 @@
 /**
- * @file Manages all reusable modals for the application.
- * This script provides global functions for showing a confirmation modal
- * and initializing all modal-related event listeners on a page.
+ * @file Manages all reusable modals for the application, including the
+ * confirmation dialog and the site-wide file viewer.
  */
 
 /**
  * Displays a confirmation modal with custom options and an action to perform.
- * This is the new, flexible way to show a confirmation dialog from any script.
- *
  * @param {object} options - The configuration for the modal.
- * @param {string} options.title - The title to display in the modal header.
- * @param {string} options.body - The text or HTML to display in the modal body.
+ * @param {string} options.title - The title to display.
+ * @param {string} options.body - The text or HTML for the body.
  * @param {string} [options.confirmText='Confirm'] - The text for the confirm button.
- * @param {Function} options.onConfirm - The function to execute when the user clicks the confirm button.
+ * @param {Function} options.onConfirm - The async function to execute on confirmation.
  */
 function showConfirmationModal({ title, body, confirmText = 'Confirm', onConfirm }) {
     const modal = document.getElementById('confirmationModal');
     if (!modal) {
-        console.error('Confirmation modal not found. Ensure the _action_modals.blade.php partial is included on this page.');
+        console.error('Confirmation modal not found.');
         return;
     }
 
-    // Get references to all the modal's parts
     const modalTitle = document.getElementById('confirmationModalTitle');
     const modalText = document.getElementById('confirmationModalText');
     const confirmBtn = document.getElementById('confirmActionBtn');
     const cancelBtn = document.getElementById('cancelConfirmationBtn');
     const statusMessage = document.getElementById('confirmation-final-status-message-area');
 
-    // Populate the modal with the new content
     modalTitle.textContent = title;
-    modalText.innerHTML = body; // Use innerHTML to allow for formatted text
+    modalText.innerHTML = body;
     confirmBtn.textContent = confirmText;
 
-    // Reset the modal to a clean state
     statusMessage.innerHTML = '';
     confirmBtn.disabled = false;
-    cancelBtn.style.display = 'inline-block';
+    cancelBtn.disabled = false;
 
-    // This is a crucial step to prevent old event listeners from firing.
-    // We clone the button to remove any previous click handlers before adding the new one.
     const newConfirmBtn = confirmBtn.cloneNode(true);
     confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
 
-    // Add the new action for this specific confirmation
     newConfirmBtn.addEventListener('click', async () => {
         newConfirmBtn.disabled = true;
         cancelBtn.disabled = true;
         statusMessage.innerHTML = `<div class="alert-info">Processing...</div>`;
 
         try {
-            await onConfirm(); // Execute the action provided
+            await onConfirm();
         } catch (error) {
             statusMessage.innerHTML = `<div class="alert-danger">${error.message}</div>`;
             newConfirmBtn.disabled = false;
@@ -74,132 +65,143 @@ function hideConfirmationModal() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    /**
-     * This function sets up all the initial event listeners for the modals on the page.
-     * It is exposed globally so that other scripts can call it if needed.
-     */
+
     function initializeActionModals() {
-        // --- File Viewer Modal ---
+        // --- FILE VIEWER MODAL ---
         const fileViewerModal = document.getElementById('fileViewerModal');
         if (fileViewerModal) {
-            const iframe = document.getElementById('fileViewerIframe');
-            const modalLabel = document.getElementById('fileViewerModalLabel');
-            const closeModalBtn = document.getElementById('closeModalBtn');
+            const iframe = fileViewerModal.querySelector('#fileViewerIframe');
             const loader = fileViewerModal.querySelector('.loader-container');
-            const feedbackContainer = document.getElementById('fileViewerFeedback');
-            const downloadBtn = document.getElementById('fileViewerDownloadBtn');
-            const slider = document.getElementById('fileViewerSlider');
-            const prevBtn = document.getElementById('prevFileBtn');
-            const nextBtn = document.getElementById('nextFileBtn');
-            const counter = document.getElementById('fileCounter');
-            const detailsContent = document.getElementById('file-details-content');
-            const toggleDetailsBtn = document.getElementById('toggleDetailsBtn');
+            const feedbackContainer = fileViewerModal.querySelector('#fileViewerFeedback');
+            const downloadBtn = fileViewerModal.querySelector('#fileViewerDownloadBtn');
+            const slider = fileViewerModal.querySelector('#fileViewerSlider');
+            const prevBtn = fileViewerModal.querySelector('#prevFileBtn');
+            const nextBtn = fileViewerModal.querySelector('#nextFileBtn');
+            const counter = fileViewerModal.querySelector('#fileCounter');
+            const detailsContent = fileViewerModal.querySelector('#file-details-content');
             const detailsPanel = fileViewerModal.querySelector('.file-details-panel');
+            const toggleDetailsBtn = fileViewerModal.querySelector('#toggleDetailsBtn');
+            const closeBtn = fileViewerModal.querySelector('#closeModalBtn');
 
             let files = [];
             let currentIndex = 0;
+            let activeFetchController = null;
+            const PREVIEWABLE_EXTENSIONS = ['pdf','png','jpg','jpeg','gif','webp','txt'];
 
-            const openFileViewer = () => {
-                fileViewerModal.classList.remove('modal-container--hidden');
-                document.body.classList.add('modal-open');
-                detailsPanel?.classList.remove('file-details-panel--hidden');
-                toggleDetailsBtn?.classList.add('active');
+            const escapeHtml = (str) => str.replace(/[&<>"']/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' })[m]);
+            const showLoader = (on = true) => loader && (loader.style.display = on ? 'flex' : 'none');
+
+            const renderDetails = (details = {}) => {
+                if (!detailsContent) return;
+                let html = '';
+                for (const [k, v] of Object.entries(details)) {
+                    if (v !== null && v !== undefined && (typeof v !== 'object')) {
+                        html += `<div class="file-details-content-item"><strong>${escapeHtml(k)}:</strong> <span>${escapeHtml(String(v))}</span></div>`;
+                    }
+                }
+                detailsContent.innerHTML = html || '<p class="text-muted">No details available.</p>';
             };
 
-            const closeFileViewer = () => {
+            const showFile = (index) => {
+                if (!files || index < 0 || index >= files.length) return;
+                currentIndex = index;
+                showLoader(true);
+                iframe.style.display = 'none';
+                feedbackContainer.style.display = 'none';
+
+                const file = files[currentIndex];
+                const isPreviewable = PREVIEWABLE_EXTENSIONS.includes(file.ext);
+                
+                if (isPreviewable) {
+                    iframe.src = (file.ext === 'pdf') ? `${file.url}#toolbar=1` : file.url;
+                    iframe.onload = () => { showLoader(false); iframe.style.display = 'block'; };
+                } else {
+                    showLoader(false);
+                    // UPDATED LOGIC: Use the existing, styled button instead of creating a new link.
+                    if (downloadBtn) {
+                        downloadBtn.href = file.url;
+                        downloadBtn.download = file.name;
+                    }
+                    if (feedbackContainer) {
+                        feedbackContainer.style.display = 'flex';
+                    }
+                }
+
+                if (counter) counter.textContent = `${currentIndex + 1} / ${files.length}`;
+                if (slider) slider.style.display = (files.length > 1) ? 'flex' : 'none';
+                if (prevBtn) prevBtn.disabled = currentIndex === 0;
+                if (nextBtn) nextBtn.disabled = currentIndex === files.length - 1;
+            };
+
+            const closeModal = () => {
                 fileViewerModal.classList.add('modal-container--hidden');
                 document.body.classList.remove('modal-open');
                 if (iframe) iframe.src = 'about:blank';
-                if (slider) slider.style.display = 'none';
-                if (detailsContent) detailsContent.innerHTML = '';
-                detailsPanel?.classList.remove('file-details-panel--hidden');
-                toggleDetailsBtn?.classList.add('active');
+                if (activeFetchController) { try { activeFetchController.abort(); } catch(e){} }
             };
 
-            const loadFile = async (fileInfo) => {
-                if (!fileInfo) return;
-                loader.style.display = 'flex';
+            window.openFileViewerModal = async (infoUrl) => {
+                fileViewerModal.classList.remove('modal-container--hidden');
+                document.body.classList.add('modal-open');
+                showLoader(true);
                 iframe.style.display = 'none';
                 feedbackContainer.style.display = 'none';
-                modalLabel.textContent = `Loading: ${fileInfo.filename}`;
                 if (detailsContent) detailsContent.innerHTML = '';
+                if (slider) slider.style.display = 'none';
+
+                if (activeFetchController) { try { activeFetchController.abort(); } catch(e){} }
+                activeFetchController = new AbortController();
 
                 try {
-                    const response = await fetch(fileInfo.infoUrl);
-                    if (!response.ok) throw new Error('Failed to fetch file info.');
-                    const data = await response.json();
-
-                    if (detailsContent && data.recordData) {
-                        let detailsHtml = '';
-                        for (const key in data.recordData) {
-                            detailsHtml += `<div class="file-details-content-item"><strong>${key}</strong><span>${data.recordData[key]}</span></div>`;
-                        }
-                        detailsContent.innerHTML = detailsHtml;
-                    }
-
-                    modalLabel.textContent = `Viewing: ${fileInfo.filename}`;
-                    iframe.onload = () => {
-                        loader.style.display = 'none';
-                        iframe.style.display = 'block';
+                    const res = await fetch(infoUrl, { headers: { 'X-Requested-With':'XMLHttpRequest' }, signal: activeFetchController.signal });
+                    if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+                    const data = await res.json();
+                    
+                    const normalize = (f) => {
+                        const url = f.file_url || f.viewUrl;
+                        const name = f.file_name || f.filename || 'file';
+                        return { url, name, ext: (name.split('.').pop() || '').toLowerCase() };
                     };
-
-                    if (data.isViewable) {
-                        iframe.src = `${data.viewUrl}#toolbar=1`;
-                    } else {
-                        downloadBtn.href = `${data.viewUrl}?download=true`;
-                        feedbackContainer.style.display = 'flex';
-                        loader.style.display = 'none';
-                    }
-                } catch (error) {
-                    modalLabel.textContent = 'Error';
-                    if (feedbackContainer) feedbackContainer.querySelector('p').textContent = 'Could not load the file.';
-                    if (downloadBtn) downloadBtn.style.display = 'none';
-                    if (feedbackContainer) feedbackContainer.style.display = 'flex';
-                    loader.style.display = 'none';
-                }
-            };
-
-            const updateSlider = () => {
-                if (counter) counter.textContent = `${currentIndex + 1} / ${files.length}`;
-                if (prevBtn) prevBtn.disabled = currentIndex === 0;
-                if (nextBtn) nextBtn.disabled = currentIndex === files.length - 1;
-                loadFile(files[currentIndex]);
-            };
-
-            prevBtn?.addEventListener('click', () => { if (currentIndex > 0) { currentIndex--; updateSlider(); } });
-            nextBtn?.addEventListener('click', () => { if (currentIndex < files.length - 1) { currentIndex++; updateSlider(); } });
-            
-            if (toggleDetailsBtn && !toggleDetailsBtn.dataset.bound) {
-            toggleDetailsBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                console.log('Before:', detailsPanel.className);
-                detailsPanel.classList.toggle('file-details-panel--hidden');
-                toggleDetailsBtn.classList.toggle('active');
-                console.log('After:', detailsPanel.className);
-            });
-            toggleDetailsBtn.dataset.bound = "true"; // prevent double binding
-            }
-
-
-            document.body.addEventListener('click', (event) => {
-                const viewButton = event.target.closest('.view-file-btn');
-                if (viewButton) {
-                    files = [];
-                    if (viewButton.dataset.infoUrl) files.push({ infoUrl: viewButton.dataset.infoUrl, filename: viewButton.dataset.filename });
-                    if (viewButton.dataset.infoUrlStudent) files.push({ infoUrl: viewButton.dataset.infoUrlStudent, filename: viewButton.dataset.filenameStudent });
-                    if (viewButton.dataset.infoUrlSupervisor) files.push({ infoUrl: viewButton.dataset.infoUrlSupervisor, filename: viewButton.dataset.filenameSupervisor });
-
+                    
+                    files = (data.files || []).map(normalize).filter(f => f.url);
+                    const details = data.details || data.recordData || {};
+                    
+                    renderDetails(details);
                     if (files.length > 0) {
-                        openFileViewer();
-                        if (slider) slider.style.display = files.length > 1 ? 'flex' : 'none';
-                        currentIndex = 0;
-                        updateSlider();
+                        showFile(0);
+                    } else {
+                        showLoader(false);
+                        // Use the feedback container for the "no files" message.
+                        if (feedbackContainer) {
+                            feedbackContainer.innerHTML = '<p class="alert-info">No files are associated with this record.</p>';
+                            feedbackContainer.style.display = 'flex';
+                        }
                     }
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.error('Error fetching files:', err);
+                        showLoader(false);
+                        if (feedbackContainer) {
+                            feedbackContainer.innerHTML = `<p class="alert-danger">Could not load file information. Please try again.</p>`;
+                            feedbackContainer.style.display = 'flex';
+                        }
+                    }
+                } finally {
+                    activeFetchController = null;
                 }
-            });
+            };
 
-            closeModalBtn?.addEventListener('click', closeFileViewer);
-            fileViewerModal.addEventListener('click', (e) => { if (e.target === fileViewerModal) closeFileViewer(); });
+            prevBtn?.addEventListener('click', () => { if (currentIndex > 0) showFile(currentIndex - 1); });
+            nextBtn?.addEventListener('click', () => { if (currentIndex < files.length - 1) showFile(currentIndex + 1); });
+            closeBtn?.addEventListener('click', closeModal);
+            fileViewerModal.addEventListener('click', (e) => { if (e.target === fileViewerModal) closeModal(); });
+            toggleDetailsBtn?.addEventListener('click', () => { detailsPanel?.classList.toggle('file-details-panel--hidden'); toggleDetailsBtn.classList.toggle('active'); });
+            document.addEventListener('keydown', (e) => {
+                if (fileViewerModal.classList.contains('modal-container--hidden')) return;
+                if (e.key === 'Escape') closeModal();
+                if (e.key === 'ArrowLeft') { if (currentIndex > 0) showFile(currentIndex - 1); }
+                if (e.key === 'ArrowRight') { if (currentIndex < files.length - 1) showFile(currentIndex + 1); }
+            });
         }
 
         // --- Confirmation Modal ---
@@ -207,54 +209,44 @@ document.addEventListener('DOMContentLoaded', () => {
         if (confirmationModal) {
             const closeBtn = document.getElementById('closeConfirmationModalBtn');
             const cancelBtn = document.getElementById('cancelConfirmationBtn');
-
-            // General closing listeners
             closeBtn?.addEventListener('click', hideConfirmationModal);
             cancelBtn?.addEventListener('click', hideConfirmationModal);
-            confirmationModal.addEventListener('click', (e) => {
-                if (e.target === confirmationModal) hideConfirmationModal();
-            });
-
-            document.body.addEventListener('click', (event) => {
-                const actionButton = event.target.closest('.confirm-action-btn');
-                if (actionButton) {
-                    showConfirmationModal({
-                        title: actionButton.dataset.modalTitle,
-                        body: actionButton.dataset.modalText,
-                        confirmText: actionButton.dataset.confirmButtonText,
-                        onConfirm: async () => {
-                            const actionUrl = actionButton.dataset.actionUrl;
-                            if (!actionUrl) return;
-
-                            const response = await fetch(actionUrl, {
-                                method: actionButton.dataset.method || 'DELETE',
-                                headers: {
-                                    'Accept': 'application/json',
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                                    'Content-Type': 'application/json'
-                                },
-                            });
-
-                            const data = await response.json();
-                            if (!response.ok) throw new Error(data.message || 'An error occurred.');
-
-                            // Handle success (remove item, reload data, etc.)
-                            const itemToRemove = actionButton.closest('tr');
-                            if (itemToRemove) itemToRemove.remove();
-                            if (typeof window.loadData === 'function') window.loadData(true);
-
-                            document.getElementById('confirmation-final-status-message-area').innerHTML = `<div class="alert-success">${data.message}</div>`;
-                            setTimeout(hideConfirmationModal, 850);
-                        }
-                    });
-                }
-            });
+            confirmationModal.addEventListener('click', (e) => { if (e.target === confirmationModal) hideConfirmationModal(); });
         }
+
+        // --- Delegated Click Listeners ---
+        document.body.addEventListener('click', (event) => {
+            const viewButton = event.target.closest('.view-file-btn');
+            if (viewButton && viewButton.dataset.infoUrl) {
+                event.preventDefault();
+                window.openFileViewerModal(viewButton.dataset.infoUrl);
+                return;
+            }
+
+            const actionButton = event.target.closest('.confirm-action-btn');
+            if (actionButton) {
+                event.preventDefault();
+                showConfirmationModal({
+                    title: actionButton.dataset.modalTitle,
+                    body: actionButton.dataset.modalText,
+                    confirmText: actionButton.dataset.confirmButtonText,
+                    onConfirm: async () => {
+                        const response = await fetch(actionButton.dataset.actionUrl, {
+                            method: actionButton.dataset.method || 'DELETE',
+                            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+                        });
+                        const data = await response.json();
+                        if (!response.ok) throw new Error(data.message || 'An error occurred.');
+                        
+                        document.getElementById('confirmation-final-status-message-area').innerHTML = `<div class="alert-success">${data.message}</div>`;
+                        if (typeof window.loadData === 'function') window.loadData(true);
+                        setTimeout(hideConfirmationModal, 850);
+                    }
+                });
+            }
+        });
     }
 
-    // Run the initialization function once the DOM is ready.
     initializeActionModals();
-
-    // Expose the function globally so other scripts (like kra-scripts.js) can call it.
     window.initializeActionModals = initializeActionModals;
 });

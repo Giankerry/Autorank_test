@@ -90,6 +90,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/application/{application}', [EvaluationController::class, 'showApplication'])->name('application.details');
         Route::get('/application/{application}/kra/{kra_slug}', [EvaluationController::class, 'showApplicationKra'])->name('application.kra');
         Route::post('/application/score/{kra_slug}/{submission_id}', [EvaluationController::class, 'scoreSubmission'])->name('submission.score');
+        Route::get('/submission/files/{kra_slug}/{submission_id}', [EvaluationController::class, 'getSubmissionFiles'])->name('submission.files');
+        Route::get('/submission/view/{kra_slug}/{submission_id}', [EvaluationController::class, 'viewFile'])->name('submission.view-file');
         Route::post('/application/{application}/calculate-score', [EvaluationController::class, 'calculateFinalScore'])->name('application.calculate-score');
     });
 

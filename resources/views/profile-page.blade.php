@@ -104,24 +104,4 @@ Profile | Autorank
 @push('page-scripts')
 <script src="{{ asset('js/modal-scripts.js') }}"></script>
 <script src="{{ asset('js/profile-page-scripts.js') }}"></script>
-</script>
-
-<style>
-    .missing-kra-list {
-        list-style-type: none;
-        padding-left: 0;
-        margin-top: 1rem;
-    }
-    .missing-kra-list li {
-        margin-bottom: 0.5rem;
-    }
-    .missing-kra-list li a {
-        text-decoration: none;
-        color: var(--primary-color, #3F51B5);
-        font-weight: 500;
-    }
-    .missing-kra-list li a:hover {
-        text-decoration: underline;
-    }
-</style>
 @endpush

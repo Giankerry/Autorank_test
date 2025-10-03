@@ -1,3 +1,4 @@
+{{-- KRA III: Extension Program / Project Involvement Table Row Loader --}}
 <tr data-id="{{ $item->id }}">
     <td>{{ $item->id }}</td>
     <td>{{ $item->title }}</td>

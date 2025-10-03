@@ -1,3 +1,4 @@
+{{-- KRA III: Administrative Designation Table Row Loader --}}
 <tr data-id="{{ $item->id }}">
     <td>{{ $item->id }}</td>
     <td>{{ $item->title }}</td>
