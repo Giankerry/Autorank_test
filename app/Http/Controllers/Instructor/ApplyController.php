@@ -10,12 +10,22 @@ use App\Models\Application;
 class ApplyController extends Controller
 {
     /**
-     * Performs a pre-check to see if the user has submissions for all KRAs within the current draft application.
+     * Performs a pre-check to see if the user's rank is set and if they have submissions for all KRAs.
      * This is intended to be called via AJAX.
      */
     public function checkSubmissions(Request $request)
     {
         $user = Auth::user();
+
+        // Pre-Check: Validate that the user has a rank assigned.
+        if (is_null($user->faculty_rank) || trim($user->faculty_rank) === '' || trim($user->faculty_rank) === 'Unset') {
+            return response()->json([
+                'success' => false,
+                'error_type' => 'rank_missing',
+                'message' => 'You do not have a faculty rank assigned. Please contact the system administrator to have your rank validated and set before submitting your CCE documents.'
+            ]);
+        }
+
         $missing = [];
 
         // Find the user's current draft application
@@ -47,7 +57,7 @@ class ApplyController extends Controller
         }
 
         if (empty($missing)) {
-            return response()->json(['success' => true]);
+            return response()->json(['success' => true, 'message' => 'Application Submitted!'], 201);
         } else {
             return response()->json(['success' => false, 'missing' => $missing]);
         }
@@ -59,6 +69,12 @@ class ApplyController extends Controller
     public function submitEvaluation(Request $request)
     {
         $user = Auth::user();
+
+        // Server-Side Gate: Final validation to ensure user has a rank.
+        // This acts as a safeguard in case the frontend check is bypassed.
+        if (is_null($user->faculty_rank) || trim($user->faculty_rank) === '' || trim($user->faculty_rank) === 'Unset') {
+            return redirect()->route('profile-page')->with('error', 'Submission Denied: You do not have a faculty rank assigned. Please contact the system administrator to have your rank validated and set before submitting your CCE documents.');
+        }
 
         // Check for an existing application that is already pending evaluation to prevent duplicates
         if ($user->applications()->where('status', 'pending evaluation')->exists()) {

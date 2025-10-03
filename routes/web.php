@@ -21,7 +21,7 @@ use App\Http\Controllers\UserPreferenceController;
 |--------------------------------------------------------------------------
 | Public Routes
 |--------------------------------------------------------------------------
-| These routes are accessible to everyone, including guests.
+| These routes are accessible to everyone.
 */
 
 Route::get('/', [PageController::class, 'signin'])->name('signin-page');
@@ -31,6 +31,11 @@ Route::prefix('auth/google')->name('auth.google.')->group(function () {
     Route::get('redirect', [SocialiteLoginController::class, 'redirectGoogleAuth'])->name('redirect');
     Route::get('callback', [SocialiteLoginController::class, 'handleGoogleCallback'])->name('callback');
 });
+
+// Redirect Route for Unlogged Users
+Route::get('/login', function () {
+    return redirect()->route('auth.google.redirect');
+})->name('login');
 
 // Dynamic CSS route for global theme color
 Route::get('/css/dynamic-styles.css', [SystemSettingsController::class, 'generateDynamicCss'])->name('dynamic.css');

@@ -10,7 +10,7 @@
             <h1>{{ $kra_title }}</h1>
         </div>
         <div class="criterion-selector">
-            {{-- Filter dropdown adapted from your reference file --}}
+            {{-- Filter dropdown --}}
             <select id="filter-select" name="filter">
                 <option value="all" selected>All Statuses</option>
                 <option value="unscored">Unscored</option>
@@ -31,7 +31,7 @@
                 <th>Date Uploaded</th>
                 <th>Score</th>
                 <th>
-                    {{-- Search bar form adapted from your reference file --}}
+                    {{-- Search bar form --}}
                     <div class="search-bar-container">
                         <form id="search-form" action="" method="GET">
                             <input type="text" name="search" placeholder="Search by title...">

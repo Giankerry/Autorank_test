@@ -270,7 +270,6 @@ class UserController extends Controller
             'Professor IV',
             'Professor V',
             'Professor VI',
-            'College / University Professor',
         ];
     }
 }

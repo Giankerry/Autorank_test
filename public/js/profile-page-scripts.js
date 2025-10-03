@@ -23,37 +23,54 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(data => {
                 if (data.success) {
-                    // --- SCENARIO B: Submissions are COMPLETE ---
+                    // --- SCENARIO C: All checks passed ---
                     showConfirmationModal({
                         title: 'Confirm Submission',
                         body: '<p>Are you sure you want to finalize your CCE submissions for evaluation? This action cannot be undone and your submissions will be locked.</p>',
                         confirmText: 'Confirm & Submit',
                         onConfirm: () => {
-                            // The onConfirm function in your modal script handles the submission process
                             document.getElementById('submit-evaluation-form').submit();
                         }
                     });
 
                 } else {
-                    // --- SCENARIO A: Submissions are INCOMPLETE ---
-                    let errorHtml = '<p>You cannot proceed. Please upload at least one document for the following Key Result Areas:</p><ul class="missing-kra-list">';
-                    data.missing.forEach(function(item) {
-                        errorHtml += `<li><a href="${item.route}">${item.name}</a></li>`;
-                    });
-                    errorHtml += '</ul>';
+                    // --- SCENARIOS where submission cannot proceed ---
 
-                    showConfirmationModal({
-                        title: 'Missing Submissions',
-                        body: errorHtml,
-                        confirmText: 'Acknowledge', // Text for the button that will be hidden
-                        onConfirm: () => {
-                            hideConfirmationModal(); // Simply close the modal on confirm
-                        }
-                    });
+                    // UPDATED LOGIC: Check for the specific error type first.
+                    if (data.error_type === 'rank_missing') {
+                        // --- SCENARIO A: Rank is MISSING ---
+                        showConfirmationModal({
+                            title: 'Rank Not Set',
+                            body: `<p>${data.message}</p>`,
+                            confirmText: 'Acknowledge',
+                            onConfirm: () => {
+                                hideConfirmationModal();
+                            }
+                        });
+                        const cancelBtn = document.getElementById('cancelConfirmationBtn');
+                        if (cancelBtn) cancelBtn.style.display = 'none';
 
-                    const confirmBtn = document.getElementById('confirmActionBtn');
-                    if(confirmBtn) {
-                       confirmBtn.style.display = 'none';
+                    } else if (data.missing && Array.isArray(data.missing)) {
+                        // --- SCENARIO B: Submissions are INCOMPLETE ---
+                        let errorHtml = '<p>You cannot proceed. Please upload at least one document for the following Key Result Areas:</p><ul class="missing-kra-list">';
+                        data.missing.forEach(function(item) {
+                            errorHtml += `<li><a href="${item.route}">${item.name}</a></li>`;
+                        });
+                        errorHtml += '</ul>';
+
+                        showConfirmationModal({
+                            title: 'Missing Submissions',
+                            body: errorHtml,
+                            confirmText: 'Acknowledge',
+                            onConfirm: () => {
+                                hideConfirmationModal();
+                            }
+                        });
+
+                        const cancelBtn = document.getElementById('cancelConfirmationBtn');
+                        if (cancelBtn) cancelBtn.style.display = 'none';
+                    } else {
+                        throw new Error('An unknown error occurred during pre-check.');
                     }
                 }
             })
@@ -67,13 +84,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         hideConfirmationModal();
                     }
                 });
-                 const confirmBtn = document.getElementById('confirmActionBtn');
-                    if(confirmBtn) {
-                       confirmBtn.style.display = 'none';
-                    }
+                const cancelBtn = document.getElementById('cancelConfirmationBtn');
+                if (cancelBtn) cancelBtn.style.display = 'none';
             })
             .finally(() => {
-                // Reset button state
                 this.textContent = 'Start CCE Evaluation Process';
                 this.disabled = false;
             });

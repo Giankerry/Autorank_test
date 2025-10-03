@@ -117,7 +117,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     iframe.onload = () => { showLoader(false); iframe.style.display = 'block'; };
                 } else {
                     showLoader(false);
-                    // UPDATED LOGIC: Use the existing, styled button instead of creating a new link.
                     if (downloadBtn) {
                         downloadBtn.href = file.url;
                         downloadBtn.download = file.name;

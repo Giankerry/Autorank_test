@@ -11,6 +11,7 @@ use App\Models\ProfessionalDevelopment;
 use App\Models\Research;
 use App\Services\AHPService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 
@@ -232,14 +233,13 @@ class EvaluationController extends Controller
     }
 
     /**
-     * UPDATED: Formats a record's data to be identical to the instructor's view.
+     * Formats a record's data to be identical to the instructor's view.
      */
     private function formatRecordDataForViewer($model, string $kra_slug): array
     {
         $data = [];
         switch ($kra_slug) {
             case 'instruction':
-                // This logic is copied from your InstructionController's formatter
                 switch ($model->criterion) {
                     case 'instructional-materials':
                         $data = ['Title' => $model->title, 'Category' => $model->category];
@@ -262,7 +262,6 @@ class EvaluationController extends Controller
                 break;
 
             case 'research':
-                // This logic is copied from your ResearchController's formatter
                 switch ($model->criterion) {
                     case 'research-outputs':
                         $data = [
@@ -293,7 +292,6 @@ class EvaluationController extends Controller
                 break;
 
             case 'extension':
-                // This logic is copied from your ExtensionController's formatter
                 switch ($model->criterion) {
                     case 'service-community':
                         $data = [
@@ -328,7 +326,6 @@ class EvaluationController extends Controller
                 break;
 
             case 'professional-development':
-                // This logic is based on your ProfessionalDevelopmentController
                 switch ($model->criterion) {
                     case 'prof-organizations':
                         $data = [
@@ -358,7 +355,6 @@ class EvaluationController extends Controller
                 break;
         }
 
-        // These fields are added to all records, matching the instructor's view
         $data['Score'] = $model->score !== null ? number_format($model->score, 2) : 'To be evaluated';
         $data['Date Uploaded'] = $model->created_at->format('F j, Y, g:i A');
 
@@ -367,11 +363,53 @@ class EvaluationController extends Controller
 
     public function calculateFinalScore(Application $application, AHPService $ahpService)
     {
-        // TODO implement
-    }
+        try {
+            // Task 3.1: Aggregate scores for each KRA
+            $application->kra1_score = $application->instructions()->sum('score');
+            $application->kra2_score = $application->researches()->sum('score');
+            $application->kra3_score = $application->extensions()->sum('score');
+            $application->kra4_score = $application->professionalDevelopments()->sum('score');
 
-    private function updateApplicationKraScores(Application $application)
-    {
-        // TODO implement
+            // Task 3.2: Implement Weighted Score Calculation
+            $user = $application->user;
+            if (!$user || !$user->faculty_rank) {
+                throw new \Exception("User or faculty rank not found for application ID: " . $application->id);
+            }
+
+            // Determine the rank category for the AHPService
+            $fullRank = $user->faculty_rank;
+            $rankCategory = 'Instructor'; // Default case
+            if (str_starts_with($fullRank, 'Assistant Professor')) {
+                $rankCategory = 'Assistant Professor';
+            } elseif (str_starts_with($fullRank, 'Associate Professor')) {
+                $rankCategory = 'Associate Professor';
+            } elseif (str_starts_with($fullRank, 'Professor')) {
+                $rankCategory = 'Professor';
+            }
+
+            $finalScore = $ahpService->calculateFinalScore($application, $rankCategory);
+
+            // Task 3.3: Implement Rank Determination & Finalize
+            $highestRank = $ahpService->getRankFromScore($finalScore);
+
+            $application->final_score = $finalScore;
+            $application->highest_attainable_rank = $highestRank;
+            $application->status = 'evaluated';
+
+            $application->save();
+
+            $successMessage = sprintf(
+                "Evaluation complete! Final CCE Score: %.2f. Highest Attainable Rank: %s.",
+                $finalScore,
+                $highestRank
+            );
+
+            return redirect()->route('evaluator.application.details', $application)
+                ->with('success', $successMessage);
+        } catch (\Exception $e) {
+            Log::error('Failed to calculate final score for application ID ' . $application->id . ': ' . $e->getMessage());
+            return redirect()->route('evaluator.application.details', $application)
+                ->with('error', 'An error occurred while calculating the scores. Please try again.');
+        }
     }
 }

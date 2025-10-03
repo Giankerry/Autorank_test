@@ -265,7 +265,6 @@ class InstructionController extends Controller
 
         $recordData = $this->formatRecordDataForViewer($instruction);
 
-        // UPDATED: Return the new JSON format
         return response()->json([
             'success' => true,
             'files'   => $filesData,
