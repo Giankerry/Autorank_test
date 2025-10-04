@@ -161,7 +161,7 @@
                         <div class="form-group" id="officer-role-group" style="display: none;"><label class="form-group-title" data-label="Role (if Officer)">Role (if Officer) *</label><input type="text" name="role"></div>
                         <div class="form-group"><label class="form-group-title" data-label="Start Date">Start Date *</label><input type="date" style="color-scheme: dark;" name="start_date" required></div>
                         <div class="form-group"><label class="form-group-title" data-label="End Date">End Date *</label><input type="date" style="color-scheme: dark;" name="end_date" required></div>
-                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Membership/Appointment">Proof of Membership/Appointment * <h6>&nbsp;&nbsp;&nbsp;5MB max</h6></label><input type="file" name="proof_file" required></div>
+                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Membership/Appointment">Proof of Membership/Appointment * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label><input type="file" name="proof_file" required></div>
                         <div class="modal-messages mt-2"></div>
                     </div>
                 </div>
@@ -207,7 +207,7 @@
                         <div class="form-group"><label class="form-group-title" data-label="Completion Date">Completion Date *</label><input type="date" style="color-scheme: dark;" name="end_date" required></div>
                         <div class="form-group" id="training-hours-group" style="display: none;"><label class="form-group-title" data-label="Number of Hours">Number of Hours *</label><input type="number" name="hours" style="color-scheme: dark;" min="1"></div>
                         <div class="form-group" id="training-level-group" style="display: none;"><label class="form-group-title" data-label="Level">Level *</label><input type="text" name="level"></div>
-                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Completion">Proof of Completion * <h6>&nbsp;&nbsp;&nbsp;5MB max</h6></label><input type="file" name="proof_file" required></div>
+                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Completion">Proof of Completion * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label><input type="file" name="proof_file" required></div>
                         <div class="modal-messages mt-2"></div>
                     </div>
                 </div>
@@ -250,7 +250,7 @@
                             @endforeach
                         </select></div>
                         <div class="form-group"><label class="form-group-title" data-label="Date Awarded">Date Awarded *</label><input type="date" style="color-scheme: dark;" name="end_date" required></div>
-                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Award">Proof of Award * <h6>&nbsp;&nbsp;&nbsp;5MB max</h6></label><input type="file" name="proof_file" required></div>
+                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Award">Proof of Award * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label><input type="file" name="proof_file" required></div>
                         <div class="modal-messages mt-2"></div>
                     </div>
                 </div>

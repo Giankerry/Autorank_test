@@ -148,7 +148,7 @@
                             </select>
                         </div>
                         <div class="form-group"><label class="form-group-title" data-label="Publication/Approval Date">Publication / Approval Date *</label><input type="date" name="publication_date" style="color-scheme: dark;" required></div>
-                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Output">Proof of Output * <h6>&nbsp;&nbsp;&nbsp;5MB max</h6></label><input type="file" name="proof_file" required></div>
+                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Output">Proof of Output * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label><input type="file" name="proof_file" required></div>
                         <div class="modal-messages mt-2"></div>
                     </div>
                 </div>
@@ -217,7 +217,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-group-title file-upload" data-label="Proof of Service">Proof of Service * <h6>&nbsp;&nbsp;&nbsp;5MB max</h6></label>
+                            <label class="form-group-title file-upload" data-label="Proof of Service">Proof of Service * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label>
                             <input type="file" name="proof_file" required>
                         </div>
                         <div class="modal-messages mt-2"></div>

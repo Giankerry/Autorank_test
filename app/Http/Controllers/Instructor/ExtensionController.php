@@ -180,7 +180,7 @@ class ExtensionController extends Controller
                     'max:255',
                     Rule::requiredIf(fn() => $request->input('category') === 'Community Service / Outreach'),
                 ],
-                'proof_file'       => 'required|file|mimes:pdf,doc,docx,jpg,png|max:5120',
+                'proof_file'       => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
             ];
         } elseif ($criterion === 'extension-involvement') {
             $rules = [

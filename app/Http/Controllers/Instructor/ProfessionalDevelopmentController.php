@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\ManagesGoogleDrive;
 use App\Models\Application;
 use App\Models\ProfessionalDevelopment;
 use App\Services\DataSearchService;
+use App\Services\DocumentAIService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -114,12 +115,23 @@ class ProfessionalDevelopmentController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, DocumentAIService $docAiService): JsonResponse
     {
         try {
             $user = Auth::user();
             $criterion = $request->input('criterion');
             $validatedData = $this->validateRequest($request, $criterion, $user->id);
+            $file = $request->file('proof_file');
+
+            $validationResult = $docAiService->validateCertificate($file, $user->full_name); 
+
+            if (!$validationResult['is_valid']) {
+                // Return immediate error if validation fails
+                $reason = $validationResult['reason'] ?? 'Document failed AI validation.';
+                Log::warning('DocAI Validation Failed for ' . $user->email . ': ' . $reason);
+                
+                return response()->json(['message' => 'Document validation failed. Reason: ' . $reason], 422);
+            }
 
             // Get or create the draft application for this evaluation cycle
             $draftApplication = $this->findOrCreateDraftApplication();
@@ -132,10 +144,19 @@ class ProfessionalDevelopmentController extends Controller
             ];
             $subFolderName = $folderNameMap[$criterion] ?? ucfirst(str_replace('-', ' ', $criterion));
 
+            $fileId = $this->uploadFileToGoogleDrive($request, 'proof_file', $kraFolderName, $subFolderName);
+
             $dataToCreate = [
                 'user_id' => $user->id,
                 'application_id' => $draftApplication->id, // Link to the application cycle
                 'criterion' => $criterion,
+                'google_drive_file_id' => $fileId,
+                'filename' => $file->getClientOriginalName(),
+
+                // saving extracted data for later
+                'extracted_issue_date' => $validationResult['extracted_data']['Date_Completed'] ?? null,
+                'extracted_issuer' => $validationResult['extracted_data']['Issuing_Organization'] ?? null,
+                'extracted_name_on_cert' => $validationResult['extracted_data']['User_Full_Name'] ?? null,
             ];
 
             // Unset checkbox values so they don't get added to the database
@@ -146,6 +167,8 @@ class ProfessionalDevelopmentController extends Controller
                     $dataToCreate[$key] = $value;
                 }
             }
+
+             ProfessionalDevelopment::create($dataToCreate);
 
             if ($request->hasFile('proof_file')) {
                 $fileId = $this->uploadFileToGoogleDrive($request, 'proof_file', $kraFolderName, $subFolderName);
@@ -160,6 +183,10 @@ class ProfessionalDevelopmentController extends Controller
             return response()->json(['message' => 'The given data was invalid.', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             Log::error('Professional Development Upload Failed: ' . $e->getMessage() . ' on line ' . $e->getLine() . ' in ' . $e->getFile());
+            if (isset($fileId)) {
+                 $this->deleteFileFromGoogleDrive($fileId, $user);
+                 Log::info('Cleaned up orphaned Google Drive file: ' . $fileId);
+            }
             return response()->json(['message' => 'An unexpected error occurred. Please try again.'], 500);
         }
     }
@@ -182,7 +209,7 @@ class ProfessionalDevelopmentController extends Controller
                 ],
                 'start_date'      => 'required|date|before_or_equal:today',
                 'end_date'        => 'required|date|after_or_equal:start_date',
-                'proof_file'      => 'required|file|mimes:pdf,doc,docx,jpg,png|max:5120',
+                'proof_file'      => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
             ];
         } elseif ($criterion === 'prof-training') {
             $nonDegreeTypes = ['Training / Seminar / Workshop', 'Conference / Forum / Symposium'];
@@ -203,7 +230,7 @@ class ProfessionalDevelopmentController extends Controller
                     'string',
                     Rule::requiredIf(fn() => !in_array($request->input('type'), $nonDegreeTypes)),
                 ],
-                'proof_file' => 'required|file|mimes:pdf,doc,docx,jpg,png|max:5120',
+                'proof_file' => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
             ];
         } elseif ($criterion === 'prof-awards') {
             $rules = [
@@ -211,7 +238,7 @@ class ProfessionalDevelopmentController extends Controller
                 'awarding_body' => 'required|string|max:255',
                 'level'         => ['required', Rule::in($options['pa_levels'])],
                 'end_date'      => ['required', 'date', 'before_or_equal:today'],
-                'proof_file'    => 'required|file|mimes:pdf,doc,docx,jpg,png|max:5120',
+                'proof_file'    => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
             ];
         }
 

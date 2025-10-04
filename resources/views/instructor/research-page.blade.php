@@ -145,7 +145,7 @@
                                 <option value="{{ $option }}">{{ $option }}</option>
                                 @endforeach
                             </select></div>
-                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Publication">Proof of Publication * <h6>&nbsp;&nbsp;&nbsp;5MB max</h6></label><input type="file" name="proof_file" required></div>
+                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Publication">Proof of Publication * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label><input type="file" name="proof_file" required></div>
                         <div class="modal-messages mt-2"></div>
                     </div>
                 </div>
@@ -203,7 +203,7 @@
                                 <option value="{{ $option }}">{{ $option }}</option>
                                 @endforeach
                             </select></div>
-                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Output">Proof of Output * <h6>&nbsp;&nbsp;&nbsp;5MB max</h6></label><input type="file" name="proof_file" required></div>
+                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Output">Proof of Output * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label><input type="file" name="proof_file" required></div>
                         <div class="modal-messages mt-2"></div>
                     </div>
                 </div>

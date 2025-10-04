@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\ManagesGoogleDrive;
 use App\Models\Application;
 use App\Models\Research;
+use App\Services\DocumentAIService;
 use App\Services\DataSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +37,7 @@ class ResearchController extends Controller
         );
     }
 
+    
     /**
      * Centralized method to get all dropdown options and dependency maps for KRA II.
      */
@@ -137,12 +139,30 @@ class ResearchController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, DocumentAIService $docAiService): JsonResponse
     {
+        $fileId = null; 
+
         try {
             $user = Auth::user();
             $criterion = $request->input('criterion');
+            
+            // 1. Initial Laravel Validation
             $validatedData = $this->validateRequest($request, $criterion, $user->id);
+            $file = $request->file('proof_file');
+            
+            // --- 2. DOCUMENT AI VALIDATION ---
+            
+            $validationResult = $docAiService->validateResearchDocument($file, $user->full_name); 
+
+            if (!$validationResult['is_valid']) {
+                $reason = $validationResult['reason'] ?? 'Document failed AI validation.';
+                Log::warning('DocAI Validation Failed for ' . $user->email . ': ' . $reason);
+                
+                return response()->json(['message' => 'Document validation failed. Reason: ' . $reason], 422);
+            }
+
+            // --- 3. PROCEED WITH UPLOAD AND DATABASE ENTRY ---
 
             // Get or create the draft application for this evaluation cycle
             $draftApplication = $this->findOrCreateDraftApplication();
@@ -153,6 +173,9 @@ class ResearchController extends Controller
                 'inventions-creative-works' => 'Inventions, Innovation, & Creative Works',
             ];
             $subFolderName = $folderNameMap[$criterion] ?? ucfirst(str_replace('-', ' ', $criterion));
+
+            // CRITICAL: File is only uploaded IF the AI validation passed
+            $fileId = $this->uploadFileToGoogleDrive($request, 'proof_file', $kraFolderName, $subFolderName);
 
             $dataToCreate = [
                 'user_id' => $user->id,
@@ -165,20 +188,24 @@ class ResearchController extends Controller
                     $dataToCreate[$key] = $value;
                 }
             }
-
-            if ($request->hasFile('proof_file')) {
-                $fileId = $this->uploadFileToGoogleDrive($request, 'proof_file', $kraFolderName, $subFolderName);
-                $dataToCreate['google_drive_file_id'] = $fileId;
-                $dataToCreate['filename'] = $request->file('proof_file')->getClientOriginalName();
-            }
-
+            
+            $dataToCreate['google_drive_file_id'] = $fileId;
+            $dataToCreate['filename'] = $request->file('proof_file')->getClientOriginalName();
+            
             Research::create($dataToCreate);
 
             return response()->json(['success' => true, 'message' => 'Successfully uploaded!'], 201);
+
         } catch (ValidationException $e) {
             return response()->json(['message' => 'The given data was invalid.', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             Log::error('Research Upload Failed: ' . $e->getMessage() . ' on line ' . $e->getLine() . ' in ' . $e->getFile());
+
+            // CRITICAL: If file upload succeeded ($fileId is set) but DB creation failed, clean up.
+            if (isset($fileId)) {
+                 $this->deleteFileFromGoogleDrive($fileId, $user);
+                 Log::info('Cleaned up orphaned Google Drive file: ' . $fileId);
+            }
             return response()->json(['message' => 'An unexpected error occurred. Please try again.'], 500);
         }
     }
@@ -207,7 +234,7 @@ class ResearchController extends Controller
                     'max:255',
                     Rule::requiredIf(fn() => in_array($request->input('category'), ['Journal Article']))
                 ],
-                'proof_file'     => 'required|file|mimes:pdf,doc,docx,jpg,png|max:5120',
+                'proof_file'     => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
             ];
         } elseif ($criterion === 'inventions-creative-works') {
             $rules = [
@@ -237,7 +264,7 @@ class ResearchController extends Controller
                     },
                 ],
                 'exhibition_date' => 'required|date|before_or_equal:today',
-                'proof_file'      => 'required|file|mimes:pdf,doc,docx,jpg,png|max:5120',
+                'proof_file'      => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
             ];
         }
 

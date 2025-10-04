@@ -196,7 +196,7 @@ class InstructionController extends Controller
                 ],
                 'role' => ['required', Rule::in($options['im_roles'])],
                 'publication_date' => 'required|date|before_or_equal:today',
-                'proof_file' => 'required|file|mimes:pdf,doc,docx,jpg,png|max:5120',
+                'proof_file' => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
             ];
         } elseif ($criterion === 'mentorship-services') {
             $uniqueRule = Rule::unique('instructions')->where(function ($query) use ($userId, $request) {
@@ -222,7 +222,7 @@ class InstructionController extends Controller
                 'student_or_competition' => ['required', 'string', $uniqueRule],
                 'completion_date' => 'required|date|before_or_equal:today',
                 'level' => ['required', Rule::in($options['ms_levels'])],
-                'proof_file' => 'required|file|mimes:pdf,doc,docx,jpg,png|max:5120',
+                'proof_file' => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
             ];
         }
 
