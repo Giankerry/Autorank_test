@@ -123,7 +123,7 @@ class ProfessionalDevelopmentController extends Controller
             $validatedData = $this->validateRequest($request, $criterion, $user->id);
             $file = $request->file('proof_file');
 
-            $validationResult = $docAiService->validateCertificate($file, $user->full_name); 
+            $validationResult = $docAiService->validateCertificate($file, $user->name); 
 
             if (!$validationResult['is_valid']) {
                 // Return immediate error if validation fails

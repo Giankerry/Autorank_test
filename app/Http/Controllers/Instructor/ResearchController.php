@@ -153,7 +153,7 @@ class ResearchController extends Controller
             
             // --- 2. DOCUMENT AI VALIDATION ---
             
-            $validationResult = $docAiService->validateResearchDocument($file, $user->full_name); 
+            $validationResult = $docAiService->validateResearchDocument($file, $user->name); 
 
             if (!$validationResult['is_valid']) {
                 $reason = $validationResult['reason'] ?? 'Document failed AI validation.';
