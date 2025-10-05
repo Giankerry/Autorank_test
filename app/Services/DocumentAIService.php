@@ -25,27 +25,23 @@ class DocumentAIService
         $this->projectId = env('GOOGLE_PROJECT_ID', '');
         $this->location = env('GOOGLE_DOCAI_LOCATION', 'us');
 
-        // 👇 Determine proper API endpoint
         $apiEndpoint = $this->location . '-documentai.googleapis.com';
 
-        // ✅ Initialize Document AI client with proper endpoint + timeout
         $this->client = new DocumentProcessorServiceClient([
             'credentials' => $keyFilePath,
             'apiEndpoint' => $apiEndpoint,
             'transportConfig' => [
                 'rest' => [
                     'restOptions' => [
-                        'timeout' => 120,          // 2 minutes
-                        'connect_timeout' => 30,   // 30 seconds
+                        'timeout' => 120,
+                        'connect_timeout' => 30,
                     ],
                 ],
             ],
         ]);
     }
 
-    /**
-     * Process a document using a specific processor.
-     */
+    // Process using a specific processor
     protected function processDocument(string $processorId, string $fileContent, string $mimeType)
     {
         if (empty($processorId)) {
@@ -63,9 +59,7 @@ class DocumentAIService
         return $this->client->processDocument($processRequest);
     }
 
-    /**
-     * Validate Research Document.
-     */
+    //Validate Research Document
     public function validateResearchDocument(UploadedFile $file, string $uploaderFullName): array
     {
         $fileContent = file_get_contents($file->getRealPath());
@@ -102,8 +96,14 @@ class DocumentAIService
                     'extracted_data' => $extractedData
                 ];
             }
+            if (empty($extractedAuthors)) {
+                return [
+                    'is_valid' => false,
+                    'reason' => 'No authors extracted from the document.',
+                    'extracted_data' => $extractedData
+                ];
+            }
 
-            // ✅ More flexible name matching (checks surname order-insensitive)
             $normalize = fn($name) => preg_replace('/[^a-z\s]/', '', strtolower($name));
             $normalizedUploader = $normalize($uploaderFullName);
 
@@ -147,9 +147,8 @@ class DocumentAIService
         }
     }
 
-    /**
-     * Validate Certificate Document.
-     */
+    //Validate Certificate Document.
+
     public function validateCertificate(UploadedFile $file, string $uploaderFullName): array
     {
         $fileContent = file_get_contents($file->getRealPath());
@@ -204,7 +203,6 @@ class DocumentAIService
                 ];
             }
 
-            // ✅ Smarter name comparison
             $normalize = fn($name) => preg_replace('/[^a-z\s]/', '', strtolower($name));
             $expected = $normalize($uploaderFullName);
             $extracted = $normalize($extractedData['User_Full_Name'] ?? '');
@@ -237,6 +235,68 @@ class DocumentAIService
                 'is_valid' => false,
                 'reason' => 'An API error occurred during processing.',
                 'extracted_data' => $extractedData
+            ];
+        }
+    }
+
+    // In app/Services/DocumentAIService.php
+    /**
+     *
+     * @param UploadedFile $file
+     * @return array
+     */
+    public function extractCertificateData(UploadedFile $file): array
+    {
+        $fileContent = file_get_contents($file->getRealPath());
+        $mimeType = $file->getClientMimeType();
+        $extractedData = [];
+
+
+        $fieldsToExtract = ['User_Full_Name', 'Issuing_Organization', 'Date_Completed', 'Credential_Type'];
+        try {
+            $extractorId = env('GOOGLE_DOCAI_EXTRACTOR_ID');
+            $extractionResponse = $this->processDocument($extractorId, $fileContent, $mimeType);
+
+            foreach ($extractionResponse->getDocument()->getEntities() as $entity) {
+                $type = $entity->getType();
+                $value = $entity->getMentionText();
+
+                if (in_array($type, $fieldsToExtract, true)) {
+                    if (empty($extractedData[$type]) && !empty($value)) {
+                        $extractedData[$type] = $value;
+                    }
+                }
+            }
+
+            if (empty($extractedData)) {
+                return [
+                    'success' => false,
+                    'extracted_data' => [],
+                    'message' => 'Could not extract any data. Please check the file quality.'
+                ];
+            }
+
+            $extractedData = [
+                'full_name' => $extractedData['User_Full_Name'] ?? null,
+                'organization' => $extractedData['Issuing_Organization'] ?? null,
+                'date_completed' => $extractedData['Date_Completed'] ?? null,
+                'credential_type' => $extractedData['Credential_Type'] ?? null,
+            ];
+
+            return [
+                'success' => true,
+                'extracted_data' => $extractedData,
+                'message' => 'Extraction completed successfully.'
+            ];
+        } catch (\Exception $e) {
+            Log::error('DocAI Autofill Extraction Failed: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'extracted_data' => [],
+                'message' => 'Extraction service failed due to an API error.'
             ];
         }
     }

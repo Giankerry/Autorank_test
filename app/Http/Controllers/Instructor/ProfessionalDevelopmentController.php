@@ -29,13 +29,10 @@ class ProfessionalDevelopmentController extends Controller
     {
         $user = Auth::user();
 
-        // Find an existing draft application or create a new one
-        return Application::firstOrCreate(
-            [
-                'user_id' => $user->id,
-                'status' => 'draft',
-            ]
-        );
+        return Application::firstOrCreate([
+            'user_id' => $user->id,
+            'status'  => 'draft',
+        ]);
     }
 
     /**
@@ -44,19 +41,14 @@ class ProfessionalDevelopmentController extends Controller
     private function getProfessionalDevelopmentOptions(): array
     {
         return [
-            // Options for Involvement in Professional Organizations
             'po_membership_types' => ['Member', 'Life Member', 'Fellow'],
-
-            // Options for Continuing Professional Education & Training
             'pt_types' => [
                 'Post-Doctoral Program',
                 'Doctoral Degree',
                 'Master\'s Degree',
                 'Training / Seminar / Workshop',
-                'Conference / Forum / Symposium'
+                'Conference / Forum / Symposium',
             ],
-
-            // Options for Awards and Recognitions
             'pa_levels' => ['Institutional / University', 'Regional', 'National', 'International'],
         ];
     }
@@ -71,7 +63,9 @@ class ProfessionalDevelopmentController extends Controller
             $searchTerm = $request->input('search');
             $offset = $request->input('offset', 0);
 
-            $query = ProfessionalDevelopment::where('user_id', $userId)->where('criterion', $criterion)->orderBy('created_at', 'desc');
+            $query = ProfessionalDevelopment::where('user_id', $userId)
+                ->where('criterion', $criterion)
+                ->orderBy('created_at', 'desc');
 
             $searchableColumns = [
                 'prof-organizations' => ['title', 'membership_type', 'role'],
@@ -86,8 +80,8 @@ class ProfessionalDevelopmentController extends Controller
             $totalMatching = (clone $query)->count();
             $items = $query->skip($offset)->take($perPage)->get();
             $html = '';
-            $partialName = 'partials._' . str_replace('-', '_', $criterion) . '_table_row';
 
+            $partialName = 'partials._' . str_replace('-', '_', $criterion) . '_table_row';
             if (view()->exists($partialName)) {
                 foreach ($items as $item) {
                     $html .= view($partialName, ['item' => $item])->render();
@@ -95,98 +89,123 @@ class ProfessionalDevelopmentController extends Controller
             }
 
             return response()->json([
-                'html'       => $html,
-                'hasMore'    => ($offset + $perPage) < $totalMatching,
-                'nextOffset' => $offset + $perPage,
+                'html'        => $html,
+                'hasMore'     => ($offset + $perPage) < $totalMatching,
+                'nextOffset'  => $offset + $perPage,
             ]);
         }
 
-        $profOrganizationsData = ProfessionalDevelopment::where('user_id', $userId)->where('criterion', 'prof-organizations')->orderBy('created_at', 'desc');
+        $profOrganizationsData = ProfessionalDevelopment::where('user_id', $userId)
+            ->where('criterion', 'prof-organizations')
+            ->orderBy('created_at', 'desc');
 
         $professionalDevelopmentOptions = $this->getProfessionalDevelopmentOptions();
 
         return view('instructor.professional-development-page', [
             'profOrganizationsData' => (clone $profOrganizationsData)->take($perPage)->get(),
-            'profTrainingData'      => ProfessionalDevelopment::where('user_id', $userId)->where('criterion', 'prof-training')->orderBy('created_at', 'desc')->take($perPage)->get(),
-            'profAwardsData'        => ProfessionalDevelopment::where('user_id', $userId)->where('criterion', 'prof-awards')->orderBy('created_at', 'desc')->take($perPage)->get(),
-            'perPage'                       => $perPage,
-            'initialHasMore'                => $profOrganizationsData->count() > $perPage,
+            'profTrainingData'      => ProfessionalDevelopment::where('user_id', $userId)
+                ->where('criterion', 'prof-training')
+                ->orderBy('created_at', 'desc')
+                ->take($perPage)
+                ->get(),
+            'profAwardsData'        => ProfessionalDevelopment::where('user_id', $userId)
+                ->where('criterion', 'prof-awards')
+                ->orderBy('created_at', 'desc')
+                ->take($perPage)
+                ->get(),
+            'perPage'                        => $perPage,
+            'initialHasMore'                 => $profOrganizationsData->count() > $perPage,
             'professionalDevelopmentOptions' => $professionalDevelopmentOptions,
         ]);
     }
 
     public function store(Request $request, DocumentAIService $docAiService): JsonResponse
     {
+        $fileId = null;
+
         try {
             $user = Auth::user();
             $criterion = $request->input('criterion');
+
+            // 1. Laravel Validation
             $validatedData = $this->validateRequest($request, $criterion, $user->id);
             $file = $request->file('proof_file');
 
-            $validationResult = $docAiService->validateCertificate($file, $user->name); 
-
+            // 2. Validate via Document AI
+            $validationResult = $docAiService->validateCertificate($file, $user->name);
             if (!$validationResult['is_valid']) {
-                // Return immediate error if validation fails
                 $reason = $validationResult['reason'] ?? 'Document failed AI validation.';
                 Log::warning('DocAI Validation Failed for ' . $user->email . ': ' . $reason);
-                
+
                 return response()->json(['message' => 'Document validation failed. Reason: ' . $reason], 422);
             }
 
-            // Get or create the draft application for this evaluation cycle
+            // 3. Upload File to Google Drive
             $draftApplication = $this->findOrCreateDraftApplication();
-
             $kraFolderName = 'KRA IV: Professional Development';
             $folderNameMap = [
                 'prof-organizations' => 'Involvement in Professional Organizations',
                 'prof-training'      => 'Continuing Professional Education & Training',
                 'prof-awards'        => 'Awards and Recognitions',
             ];
-            $subFolderName = $folderNameMap[$criterion] ?? ucfirst(str_replace('-', ' ', $criterion));
 
+            $subFolderName = $folderNameMap[$criterion] ?? ucfirst(str_replace('-', ' ', $criterion));
             $fileId = $this->uploadFileToGoogleDrive($request, 'proof_file', $kraFolderName, $subFolderName);
 
+            // 4. Build Final Data Array with Extracted Data
             $dataToCreate = [
-                'user_id' => $user->id,
-                'application_id' => $draftApplication->id, // Link to the application cycle
-                'criterion' => $criterion,
-                'google_drive_file_id' => $fileId,
-                'filename' => $file->getClientOriginalName(),
-
-                // saving extracted data for later
-                'extracted_issue_date' => $validationResult['extracted_data']['Date_Completed'] ?? null,
-                'extracted_issuer' => $validationResult['extracted_data']['Issuing_Organization'] ?? null,
-                'extracted_name_on_cert' => $validationResult['extracted_data']['User_Full_Name'] ?? null,
+                'user_id'                 => $user->id,
+                'application_id'          => $draftApplication->id,
+                'criterion'               => $criterion,
+                'google_drive_file_id'    => $fileId,
+                'filename'                => $file->getClientOriginalName(),
+                'extracted_issue_date'    => $validationResult['extracted_data']['Date_Completed'] ?? null,
+                'extracted_issuer'        => $validationResult['extracted_data']['Issuing_Organization'] ?? null,
+                'extracted_name_on_cert'  => $validationResult['extracted_data']['User_Full_Name'] ?? null,
+                'extracted_credential_type' => $validationResult['extracted_data']['Credential_Type'] ?? null,
             ];
 
-            // Unset checkbox values so they don't get added to the database
-            unset($validatedData['is_officer']);
+            // 5. Merge User Input, prioritize extracted fields
+            $finalData = $validatedData;
+            unset($finalData['is_officer'], $finalData['proof_file']);
 
-            foreach ($validatedData as $key => $value) {
-                if (!$request->hasFile($key)) {
-                    $dataToCreate[$key] = $value;
+            $extractedIssuer = $validationResult['extracted_data']['Issuing_Organization'] ?? null;
+            $extractedCredentialType = $validationResult['extracted_data']['Credential_Type'] ?? null;
+
+            if ($criterion === 'prof-training') {
+                $finalData['organizer'] = $extractedIssuer ?? $finalData['organizer'];
+                $finalData['title'] = $extractedCredentialType ?? $finalData['title'];
+            } elseif ($criterion === 'prof-awards') {
+                if ($extractedIssuer) {
+                    $finalData['awarding_body'] = $extractedIssuer ?? $finalData['awarding_body'];
+                    $finalData['title'] = $extractedCredentialType ?? $finalData['title'];
                 }
+            } elseif ($criterion === 'prof-organizations') {
+                $finalData['title'] = $extractedIssuer ?? $finalData['title'];
             }
 
-             ProfessionalDevelopment::create($dataToCreate);
-
-            if ($request->hasFile('proof_file')) {
-                $fileId = $this->uploadFileToGoogleDrive($request, 'proof_file', $kraFolderName, $subFolderName);
-                $dataToCreate['google_drive_file_id'] = $fileId;
-                $dataToCreate['filename'] = $request->file('proof_file')->getClientOriginalName();
-            }
-
+            $dataToCreate = array_merge($dataToCreate, $finalData);
             ProfessionalDevelopment::create($dataToCreate);
 
             return response()->json(['success' => true, 'message' => 'Successfully uploaded!'], 201);
         } catch (ValidationException $e) {
-            return response()->json(['message' => 'The given data was invalid.', 'errors' => $e->errors()], 422);
-        } catch (\Exception $e) {
-            Log::error('Professional Development Upload Failed: ' . $e->getMessage() . ' on line ' . $e->getLine() . ' in ' . $e->getFile());
             if (isset($fileId)) {
-                 $this->deleteFileFromGoogleDrive($fileId, $user);
-                 Log::info('Cleaned up orphaned Google Drive file: ' . $fileId);
+                $this->deleteFileFromGoogleDrive($fileId, $user);
             }
+
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Professional Development Upload Failed: ' . $e->getMessage() .
+                ' on line ' . $e->getLine() . ' in ' . $e->getFile());
+
+            if (isset($fileId)) {
+                $this->deleteFileFromGoogleDrive($fileId, $user);
+                Log::info('Cleaned up orphaned Google Drive file: ' . $fileId);
+            }
+
             return response()->json(['message' => 'An unexpected error occurred. Please try again.'], 500);
         }
     }
@@ -207,9 +226,9 @@ class ProfessionalDevelopmentController extends Controller
                     'max:255',
                     Rule::requiredIf(fn() => $request->has('is_officer')),
                 ],
-                'start_date'      => 'required|date|before_or_equal:today',
-                'end_date'        => 'required|date|after_or_equal:start_date',
-                'proof_file'      => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
+                'start_date' => 'required|date|before_or_equal:today',
+                'end_date'   => 'required|date|after_or_equal:start_date',
+                'proof_file' => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
             ];
         } elseif ($criterion === 'prof-training') {
             $nonDegreeTypes = ['Training / Seminar / Workshop', 'Conference / Forum / Symposium'];
@@ -225,7 +244,7 @@ class ProfessionalDevelopmentController extends Controller
                     'min:1',
                     Rule::requiredIf(fn() => in_array($request->input('type'), $nonDegreeTypes)),
                 ],
-                'level'      => [
+                'level' => [
                     'nullable',
                     'string',
                     Rule::requiredIf(fn() => !in_array($request->input('type'), $nonDegreeTypes)),
@@ -235,7 +254,7 @@ class ProfessionalDevelopmentController extends Controller
         } elseif ($criterion === 'prof-awards') {
             $rules = [
                 'title'         => ['required', 'string', 'max:255'],
-                'awarding_body' => 'required|string|max:255',
+                'awarding_body' => ['required', 'string', 'max:255'],
                 'level'         => ['required', Rule::in($options['pa_levels'])],
                 'end_date'      => ['required', 'date', 'before_or_equal:today'],
                 'proof_file'    => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
@@ -250,14 +269,18 @@ class ProfessionalDevelopmentController extends Controller
         if ($professionalDevelopment->user_id !== Auth::id()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
+
         try {
             if ($professionalDevelopment->google_drive_file_id) {
                 $this->deleteFileFromGoogleDrive($professionalDevelopment->google_drive_file_id, $professionalDevelopment->user);
             }
+
             $professionalDevelopment->delete();
+
             return response()->json(['message' => 'Item deleted successfully.']);
         } catch (\Exception $e) {
             Log::error('Professional Development Deletion Failed: ' . $e->getMessage());
+
             return response()->json(['message' => 'Failed to delete the item. Please try again later.'], 500);
         }
     }
@@ -265,16 +288,20 @@ class ProfessionalDevelopmentController extends Controller
     public function getFileInfo($id)
     {
         $professionalDevelopment = ProfessionalDevelopment::findOrFail($id);
+
         if ($professionalDevelopment->user_id !== Auth::id()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
+
         $filesData = [];
+
         if ($professionalDevelopment->google_drive_file_id) {
             $filesData[] = [
                 'file_name' => $professionalDevelopment->filename ?? 'Download File',
                 'file_url'  => route('instructor.professional-development.view-file', ['id' => $id]),
             ];
         }
+
         return response()->json([
             'success' => true,
             'files'   => $filesData,
@@ -295,22 +322,23 @@ class ProfessionalDevelopmentController extends Controller
 
     /**
      * Formats a ProfessionalDevelopment record's data for the file viewer.
-     *
-     * @param \App\Models\ProfessionalDevelopment $professionalDevelopment
-     * @return array
      */
     private function formatRecordDataForViewer(ProfessionalDevelopment $professionalDevelopment): array
     {
         $data = [];
+
         switch ($professionalDevelopment->criterion) {
             case 'prof-organizations':
                 $data = [
                     'Organization Name' => $professionalDevelopment->title,
-                    'Membership Type' => $professionalDevelopment->membership_type,
-                    'Start Date' => Carbon::parse($professionalDevelopment->start_date)->format('F j, Y'),
-                    'End Date' => Carbon::parse($professionalDevelopment->end_date)->format('F j, Y'),
-                    'Score' => $professionalDevelopment->score !== null ? number_format($professionalDevelopment->score, 2) : 'To be evaluated',
+                    'Membership Type'   => $professionalDevelopment->membership_type,
+                    'Start Date'        => Carbon::parse($professionalDevelopment->start_date)->format('F j, Y'),
+                    'End Date'          => Carbon::parse($professionalDevelopment->end_date)->format('F j, Y'),
+                    'Score'             => $professionalDevelopment->score !== null
+                        ? number_format($professionalDevelopment->score, 2)
+                        : 'To be evaluated',
                 ];
+
                 if ($professionalDevelopment->role) {
                     $data['Role (as Officer)'] = $professionalDevelopment->role;
                 }
@@ -319,15 +347,19 @@ class ProfessionalDevelopmentController extends Controller
             case 'prof-training':
                 $data = [
                     'Title of Training/Degree' => $professionalDevelopment->title,
-                    'Type' => $professionalDevelopment->type,
-                    'Organizer/Institution' => $professionalDevelopment->organizer,
-                    'Start Date' => Carbon::parse($professionalDevelopment->start_date)->format('F j, Y'),
-                    'Completion Date' => Carbon::parse($professionalDevelopment->end_date)->format('F j, Y'),
-                    'Score' => $professionalDevelopment->score !== null ? number_format($professionalDevelopment->score, 2) : 'To be evaluated',
+                    'Type'                     => $professionalDevelopment->type,
+                    'Organizer/Institution'    => $professionalDevelopment->organizer,
+                    'Start Date'               => Carbon::parse($professionalDevelopment->start_date)->format('F j, Y'),
+                    'Completion Date'          => Carbon::parse($professionalDevelopment->end_date)->format('F j, Y'),
+                    'Score'                    => $professionalDevelopment->score !== null
+                        ? number_format($professionalDevelopment->score, 2)
+                        : 'To be evaluated',
                 ];
+
                 if ($professionalDevelopment->hours) {
                     $data['Number of Hours'] = $professionalDevelopment->hours;
                 }
+
                 if ($professionalDevelopment->level) {
                     $data['Level'] = $professionalDevelopment->level;
                 }
@@ -335,50 +367,48 @@ class ProfessionalDevelopmentController extends Controller
 
             case 'prof-awards':
                 $data = [
-                    'Award Title' => $professionalDevelopment->title,
+                    'Award Title'   => $professionalDevelopment->title,
                     'Awarding Body' => $professionalDevelopment->awarding_body,
-                    'Level' => $professionalDevelopment->level,
-                    'Date Awarded' => Carbon::parse($professionalDevelopment->end_date)->format('F j, Y'),
-                    'Score' => $professionalDevelopment->score !== null ? number_format($professionalDevelopment->score, 2) : 'To be evaluated',
+                    'Level'         => $professionalDevelopment->level,
+                    'Date Awarded'  => Carbon::parse($professionalDevelopment->end_date)->format('F j, Y'),
+                    'Score'         => $professionalDevelopment->score !== null
+                        ? number_format($professionalDevelopment->score, 2)
+                        : 'To be evaluated',
                 ];
                 break;
         }
 
         $data['Date Uploaded'] = $professionalDevelopment->created_at->format('F j, Y, g:i A');
+
         return $data;
     }
 
+    public function autofillCertificate(Request $request, DocumentAIService $docAiService): JsonResponse
+    {
+        if (!$request->hasFile('proof_file')) {
+            return response()->json(['success' => false, 'message' => 'No file uploaded for extraction.'], 400);
+        }
 
-public function autofillCertificate(Request $request, DocumentAIService $docAiService): JsonResponse
-{
-    // Basic security and file check
-    if (!$request->hasFile('proof_file')) {
-        return response()->json(['success' => false, 'message' => 'No file uploaded for extraction.'], 400);
-    }
-    
-    // Validate file integrity before sending it to Google Cloud
-    $request->validate([
-        'proof_file' => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
-    ]);
-
-    $file = $request->file('proof_file');
-    $result = $docAiService->extractCertificateData($file);
-
-    if ($result['success']) {
-        return response()->json([
-            'success' => true,
-            'fields' => [
-                'issuer_name' => $result['extracted_data']['Issuing_Organization'] ?? '',
-                'completion_date' => $result['extracted_data']['Date_Completed'] ?? '',
-                'user_name_on_cert' => $result['extracted_data']['User_Full_Name'] ?? ''
-            ]
+        $request->validate([
+            'proof_file' => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
         ]);
+
+        $file = $request->file('proof_file');
+        $result = $docAiService->extractCertificateData($file);
+
+        if ($result['success']) {
+            return response()->json([
+                'success' => true,
+                'fields'  => [
+                    'issuer_name'      => $result['extracted_data']['Issuing_Organization'] ?? '',
+                    'user_name_on_cert' => $result['extracted_data']['User_Full_Name'] ?? '',
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $result['message'],
+        ], 500);
     }
-
-    return response()->json([
-        'success' => false,
-        'message' => $result['message'] 
-    ], 500);
-}
-
 }
