@@ -347,4 +347,38 @@ class ProfessionalDevelopmentController extends Controller
         $data['Date Uploaded'] = $professionalDevelopment->created_at->format('F j, Y, g:i A');
         return $data;
     }
+
+
+public function autofillCertificate(Request $request, DocumentAIService $docAiService): JsonResponse
+{
+    // Basic security and file check
+    if (!$request->hasFile('proof_file')) {
+        return response()->json(['success' => false, 'message' => 'No file uploaded for extraction.'], 400);
+    }
+    
+    // Validate file integrity before sending it to Google Cloud
+    $request->validate([
+        'proof_file' => 'required|file|mimes:pdf,doc,docx,jpg,png|max:10240',
+    ]);
+
+    $file = $request->file('proof_file');
+    $result = $docAiService->extractCertificateData($file);
+
+    if ($result['success']) {
+        return response()->json([
+            'success' => true,
+            'fields' => [
+                'issuer_name' => $result['extracted_data']['Issuing_Organization'] ?? '',
+                'completion_date' => $result['extracted_data']['Date_Completed'] ?? '',
+                'user_name_on_cert' => $result['extracted_data']['User_Full_Name'] ?? ''
+            ]
+        ]);
+    }
+
+    return response()->json([
+        'success' => false,
+        'message' => $result['message'] 
+    ], 500);
+}
+
 }

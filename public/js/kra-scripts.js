@@ -448,4 +448,112 @@ function initializeUploadModal(modal) {
             [confirmBtn, backBtn, closeBtn].forEach(btn => btn.disabled = false);
         }
     });
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Array of all file input IDs used across the modals
+    const fileInputIds = [
+        'org-proof-file-input',       // Criterion A: Organizations
+        'training-proof-file-input',  // Criterion B: Training
+        'awards-proof-file-input'     // Criterion C: Awards
+    ];
+
+    fileInputIds.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('change', function() {
+                const criterion = this.closest('.role-modal-container').id.replace('prof-', '').replace('-modal', '');
+                handleCertificateAutofill(this, criterion);
+            });
+        }
+    });
+
+    function handleCertificateAutofill(fileInput, criterion) {
+        const file = fileInput.files[0];
+        
+        // Dynamically locate the status and message elements based on the criterion
+        const statusDiv = document.getElementById('autofill-status-' + criterion);
+        const messageSpan = document.getElementById('autofill-message-' + criterion);
+        
+        // Map the extraction fields to the specific IDs in the active modal
+        let fields = {};
+        
+        if (criterion === 'training') {
+            // Criterion B: Continuing Professional Education & Training
+            fields = {
+                issuer: document.getElementById('training-organizer-input'),
+                date: document.getElementById('training-completion-date-input'),
+                certHolderName: document.getElementById('training-cert-holder-name')
+            };
+        } else if (criterion === 'awards') {
+            // Criterion C: Awards and Recognitions
+            fields = {
+                issuer: document.getElementById('awards-awarding-body-input'),
+                date: document.getElementById('awards-end-date-input'),
+                certHolderName: document.getElementById('awards-cert-holder-name')
+            };
+        } else if (criterion === 'organizations') {
+            // Criterion A: Involvement in Professional Organizations
+            fields = {
+                issuer: document.getElementById('org-name-input'),
+                date: document.getElementById('org-start-date-input'), // Assumes start date is extracted/used
+                certHolderName: document.getElementById('org-cert-holder-name')
+            };
+        } else {
+            return;
+        }
+
+        if (!file) return;
+
+        // 1. Show loading state in the modal
+        statusDiv.style.display = 'block';
+        messageSpan.textContent = 'Extracting data... please wait.';
+        messageSpan.style.color = '#fff'; 
+        
+        for (const key in fields) {
+            if (fields[key]) fields[key].value = '';
+        }
+
+        const formData = new FormData();
+        formData.append('proof_file', file);
+        formData.append('_token', document.querySelector('meta[name="csrf-token"]').getAttribute('content')); 
+
+        fetch('/api/instructor/certificate/autofill', { 
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(error => { 
+                    throw new Error(error.message || 'API endpoint error.'); 
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                
+                // Populate the main fields
+                fields.issuer.value = data.fields.issuer_name || '';
+                fields.date.value = data.fields.completion_date || ''; // Populates the Date Completed/Awarded input
+                
+                // Populate the hidden certificate holder name for the validation check later
+                if (fields.certHolderName) {
+                    fields.certHolderName.value = data.fields.user_name_on_cert || '';
+                }
+
+                messageSpan.textContent = 'Autofill successful! Please review the extracted data.';
+                messageSpan.style.color = '#38a169'; // Green
+            } else {
+                messageSpan.textContent = 'Autofill failed: ' + data.message + ' Enter details manually.';
+                messageSpan.style.color = 'red';
+            }
+        })
+        .catch(error => {
+            messageSpan.textContent = 'A critical network error occurred. Please try again.';
+            messageSpan.style.color = 'red';
+            console.error('Extraction Error:', error);
+        });
+    }
+});
+
 }

@@ -139,29 +139,73 @@
 {{-- ================= KRA IV: UPLOAD MODALS =========================== --}}
 {{-- =================================================================== --}}
 
+
 {{-- Criterion A: Involvement in Professional Organizations Upload Modal --}}
 <div class="role-modal-container" id="prof-organizations-modal" style="display: none;">
     <div class="role-modal">
         <div class="role-modal-navigation"><i class="fa-solid fa-xmark close-modal-btn"></i></div>
         <div class="initial-step">
-            <form class="kra-upload-form" action="{{ route('instructor.professional-development.store') }}" method="POST" enctype="multipart/form-data">
+            <form class="kra-upload-form" id="prof-organizations-upload-form" 
+                action="{{ route('instructor.professional-development.store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="criterion" value="prof-organizations">
                 <div class="role-modal-content">
                     <div class="role-modal-content-header"><h1>Upload Involvement in Professional Organization</h1><p>Fill out the details below.</p></div>
                     <div class="role-modal-content-body">
-                        <div class="form-group"><label class="form-group-title" data-label="Organization Name">Organization Name *</label><input type="text" name="title" required></div>
-                        <div class="form-group"><label class="form-group-title" data-label="Membership Type">Membership Type *</label><select class="select-input" name="membership_type" required>
-                            <option value="" disabled selected>Click here to select</option>
-                            @foreach($professionalDevelopmentOptions['po_membership_types'] as $option)
-                            <option value="{{ $option }}">{{ $option }}</option>
-                            @endforeach
-                        </select></div>
-                        <div class="form-group-checkbox"><input type="checkbox" id="is-officer-checkbox" name="is_officer" value="1"><label for="is-officer-checkbox">I am an Officer</label></div>
-                        <div class="form-group" id="officer-role-group" style="display: none;"><label class="form-group-title" data-label="Role (if Officer)">Role (if Officer) *</label><input type="text" name="role"></div>
-                        <div class="form-group"><label class="form-group-title" data-label="Start Date">Start Date *</label><input type="date" style="color-scheme: dark;" name="start_date" required></div>
-                        <div class="form-group"><label class="form-group-title" data-label="End Date">End Date *</label><input type="date" style="color-scheme: dark;" name="end_date" required></div>
-                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Membership/Appointment">Proof of Membership/Appointment * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label><input type="file" name="proof_file" required></div>
+                        
+                        {{-- Field to be autofilled by DocAI: Organization Name --}}
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Organization Name">Organization Name *</label>
+                            <input type="text" name="title" id="org-name-input" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Membership Type">Membership Type *</label>
+                            <select class="select-input" name="membership_type" required>
+                                <option value="" disabled selected>Click here to select</option>
+                                @foreach($professionalDevelopmentOptions['po_membership_types'] as $option)
+                                <option value="{{ $option }}">{{ $option }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        
+                        <div class="form-group-checkbox">
+                            <input type="checkbox" id="is-officer-checkbox" name="is_officer" value="1">
+                            <label for="is-officer-checkbox">I am an Officer</label>
+                        </div>
+                        
+                        <div class="form-group" id="officer-role-group" style="display: none;">
+                            <label class="form-group-title" data-label="Role (if Officer)">Role (if Officer) *</label>
+                            <input type="text" name="role">
+                        </div>
+                        
+                        {{-- Field to be autofilled by DocAI: Name on Certificate --}}
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Name on Certificate">Name on Certificate (for Verification) *</label>
+                            <input type="text" name="cert_holder_name" id="org-cert-holder-name" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Start Date">Start Date *</label>
+                            <input type="date" style="color-scheme: dark;" name="start_date" id="org-start-date-input" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="End Date">End Date *</label>
+                            <input type="date" style="color-scheme: dark;" name="end_date" required>
+                        </div>
+                        
+                        {{-- FILE UPLOAD AND AUTOFILL STATUS AREA --}}
+                        <div class="form-group">
+                            <label class="form-group-title file-upload" data-label="Proof of Membership/Appointment">Proof of Membership/Appointment * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label>
+                            <input type="file" name="proof_file" id="org-proof-file-input" required>
+                        </div>
+
+                        <div id="autofill-status-org" style="display: none; margin-top: 10px; padding: 10px; background: #2a3447; border-radius: 5px;">
+                            <i class="fa-solid fa-spinner fa-spin-pulse" style="margin-right: 5px;"></i>
+                            <span id="autofill-message-org" style="color: #fff;"></span>
+                        </div>
+                        
                         <div class="modal-messages mt-2"></div>
                     </div>
                 </div>
@@ -184,30 +228,76 @@
     </div>
 </div>
 
-{{-- Criterion B: Continuing Professional Education & Training Upload Modal --}}
+{{-- Criterion B: Continuing Professional Education & Training Upload Modal (IDs adjusted for consistency) --}}
 <div class="role-modal-container" id="prof-training-modal" style="display: none;">
     <div class="role-modal">
         <div class="role-modal-navigation"><i class="fa-solid fa-xmark close-modal-btn"></i></div>
         <div class="initial-step">
-            <form class="kra-upload-form" action="{{ route('instructor.professional-development.store') }}" method="POST" enctype="multipart/form-data">
+            <form class="kra-upload-form" id="prof-training-upload-form" 
+                action="{{ route('instructor.professional-development.store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="criterion" value="prof-training">
                 <div class="role-modal-content">
                     <div class="role-modal-content-header"><h1>Upload Continuing Prof. Education & Training</h1><p>Fill out the details below.</p></div>
                     <div class="role-modal-content-body">
-                        <div class="form-group"><label class="form-group-title" data-label="Title of Training/Degree">Title of Training / Degree *</label><input type="text" name="title" required></div>
-                        <div class="form-group"><label class="form-group-title" data-label="Type">Type *</label><select class="select-input" name="type" required>
-                            <option value="" disabled selected>Click here to select</option>
-                            @foreach($professionalDevelopmentOptions['pt_types'] as $option)
-                            <option value="{{ $option }}">{{ $option }}</option>
-                            @endforeach
-                        </select></div>
-                        <div class="form-group"><label class="form-group-title" data-label="Organizer/Institution">Organizer / Institution *</label><input type="text" name="organizer" required></div>
-                        <div class="form-group"><label class="form-group-title" data-label="Start Date">Start Date *</label><input type="date" name="start_date" style="color-scheme: dark;" required></div>
-                        <div class="form-group"><label class="form-group-title" data-label="Completion Date">Completion Date *</label><input type="date" style="color-scheme: dark;" name="end_date" required></div>
-                        <div class="form-group" id="training-hours-group" style="display: none;"><label class="form-group-title" data-label="Number of Hours">Number of Hours *</label><input type="number" name="hours" style="color-scheme: dark;" min="1"></div>
-                        <div class="form-group" id="training-level-group" style="display: none;"><label class="form-group-title" data-label="Level">Level *</label><input type="text" name="level"></div>
-                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Completion">Proof of Completion * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label><input type="file" name="proof_file" required></div>
+                        
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Title of Training/Degree">Title of Training / Degree *</label>
+                            <input type="text" name="title" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Type">Type *</label>
+                            <select class="select-input" name="type" required>
+                                <option value="" disabled selected>Click here to select</option>
+                                @foreach($professionalDevelopmentOptions['pt_types'] as $option)
+                                <option value="{{ $option }}">{{ $option }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        
+                        {{-- Field to be autofilled by DocAI: Organizer / Institution --}}
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Organizer/Institution">Organizer / Institution *</label>
+                            <input type="text" name="organizer" id="training-organizer-input" required>
+                        </div>
+                        
+                        {{-- Field to be autofilled by DocAI: Name on Certificate (Hidden from main form, but used by AI logic) --}}
+                        <input type="hidden" name="cert_holder_name" id="training-cert-holder-name">
+                        
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Start Date">Start Date *</label>
+                            <input type="date" name="start_date" style="color-scheme: dark;" required>
+                        </div>
+                        
+                        {{-- Field to be autofilled by DocAI: Completion Date --}}
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Completion Date">Completion Date *</label>
+                            <input type="date" style="color-scheme: dark;" name="end_date" id="training-completion-date-input" required>
+                        </div>
+                        
+                        <div class="form-group" id="training-hours-group" style="display: none;">
+                            <label class="form-group-title" data-label="Number of Hours">Number of Hours *</label>
+                            <input type="number" name="hours" style="color-scheme: dark;" min="1">
+                        </div>
+                        
+                        <div class="form-group" id="training-level-group" style="display: none;">
+                            <label class="form-group-title" data-label="Level">Level *</label>
+                            <input type="text" name="level">
+                        </div>
+                        
+                        {{-- FILE UPLOAD AND AUTOFILL STATUS AREA --}}
+                        <div class="form-group">
+                            <label class="form-group-title file-upload" data-label="Proof of Completion">Proof of Completion * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label>
+                            {{-- ADDED UNIQUE ID FOR JAVASCRIPT LISTENER --}}
+                            <input type="file" name="proof_file" id="training-proof-file-input" required> 
+                        </div>
+
+                        <div id="autofill-status-training" style="display: none; margin-top: 10px; padding: 10px; background: #2a3447; border-radius: 5px;">
+                            <i class="fa-solid fa-spinner fa-spin-pulse" style="margin-right: 5px;"></i>
+                            <span id="autofill-message-training" style="color: #fff;"></span>
+                        </div>
+                        
                         <div class="modal-messages mt-2"></div>
                     </div>
                 </div>
@@ -235,22 +325,55 @@
     <div class="role-modal">
         <div class="role-modal-navigation"><i class="fa-solid fa-xmark close-modal-btn"></i></div>
         <div class="initial-step">
-            <form class="kra-upload-form" action="{{ route('instructor.professional-development.store') }}" method="POST" enctype="multipart/form-data">
+            <form class="kra-upload-form" id="prof-awards-upload-form" 
+                action="{{ route('instructor.professional-development.store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <input type="hidden" name="criterion" value="prof-awards">
                 <div class="role-modal-content">
                     <div class="role-modal-content-header"><h1>Upload Award and Recognition</h1><p>Fill out the details below.</p></div>
                     <div class="role-modal-content-body">
-                        <div class="form-group"><label class="form-group-title" data-label="Award Title">Award Title *</label><input type="text" name="title" required></div>
-                        <div class="form-group"><label class="form-group-title" data-label="Awarding Body">Awarding Body *</label><input type="text" name="awarding_body" required></div>
-                        <div class="form-group"><label class="form-group-title" data-label="Level">Level *</label><select class="select-input" name="level" required>
-                            <option value="" disabled selected>Click here to select</option>
-                             @foreach($professionalDevelopmentOptions['pa_levels'] as $option)
-                            <option value="{{ $option }}">{{ $option }}</option>
-                            @endforeach
-                        </select></div>
-                        <div class="form-group"><label class="form-group-title" data-label="Date Awarded">Date Awarded *</label><input type="date" style="color-scheme: dark;" name="end_date" required></div>
-                        <div class="form-group"><label class="form-group-title file-upload" data-label="Proof of Award">Proof of Award * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label><input type="file" name="proof_file" required></div>
+                        
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Award Title">Award Title</label>
+                            <input type="text" name="title">
+                        </div>
+                        
+                        {{-- Field to be autofilled by DocAI: Awarding Body --}}
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Awarding Body">Awarding Body</label>
+                            <input type="text" name="awarding_body" id="awards-awarding-body-input">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Level">Level *</label>
+                            <select class="select-input" name="level" required>
+                                <option value="" disabled selected>Click here to select</option>
+                                @foreach($professionalDevelopmentOptions['pa_levels'] as $option)
+                                <option value="{{ $option }}">{{ $option }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        
+                        {{-- Field to be autofilled by DocAI: Name on Certificate (Hidden from main form, but used by AI logic) --}}
+                        <input type="hidden" name="cert_holder_name" id="awards-cert-holder-name">
+
+                        {{-- Field to be autofilled by DocAI: Date Awarded --}}
+                        <div class="form-group">
+                            <label class="form-group-title" data-label="Date Awarded">Date Awarded *</label>
+                            <input type="date" style="color-scheme: dark;" name="end_date" id="awards-end-date-input" required>
+                        </div>
+                        
+                        {{-- FILE UPLOAD AND AUTOFILL STATUS AREA --}}
+                        <div class="form-group">
+                            <label class="form-group-title file-upload" data-label="Proof of Award">Proof of Award * <h6>&nbsp;&nbsp;&nbsp;10MB max</h6></label>
+                            <input type="file" name="proof_file" id="awards-proof-file-input" required>
+                        </div>
+                        
+                        <div id="autofill-status-awards" style="display: none; margin-top: 10px; padding: 10px; background: #2a3447; border-radius: 5px;">
+                            <i class="fa-solid fa-spinner fa-spin-pulse" style="margin-right: 5px;"></i>
+                            <span id="autofill-message-awards" style="color: #fff;"></span>
+                        </div>
+
                         <div class="modal-messages mt-2"></div>
                     </div>
                 </div>
