@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
-use Google\Cloud\DocumentAi\V1\DocumentProcessorServiceClient;
-use Google\Cloud\DocumentAi\V1\RawDocument;
+use Google\Cloud\DocumentAI\V1\Client\DocumentProcessorServiceClient;
+use Google\Cloud\DocumentAI\V1\RawDocument;
+use Google\Cloud\DocumentAI\V1\ProcessRequest;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
@@ -17,8 +18,19 @@ class DocumentAIService
 
     public function __construct()
     {
-        // Initialize the Document AI client using credentials configured for the environment.
-        $this->client = new DocumentProcessorServiceClient();
+
+       $keyFilePath = config('services.google_cloud.key_file_path');
+
+        // Check if the file exists before attempting initialization
+        if (!file_exists($keyFilePath)) {
+             throw new \Exception("Google Cloud key file not found at path: {$keyFilePath}");
+        }
+
+        $this->client = new DocumentProcessorServiceClient([
+            'credentials' => $keyFilePath,
+            'transport' => 'rest' // Use REST transport for stability if gRPC is an issue
+        ]);
+
         $this->projectId = env('GOOGLE_PROJECT_ID');
         $this->location = env('GOOGLE_DOCAI_LOCATION');
     }
@@ -37,7 +49,11 @@ class DocumentAIService
         $processorName = $this->client->processorName($this->projectId, $this->location, $processorId);
         $rawDocument = new RawDocument(['content' => $fileContent, 'mime_type' => $mimeType]);
 
-        return $this->client->processDocument(['name' => $processorName, 'rawDocument' => $rawDocument]);
+        $processRequest = new ProcessRequest([
+            'name' => $processorName,
+            'raw_document' => $rawDocument
+        ]);
+        return $this->client->processDocument($processRequest);
     }
     
     /**

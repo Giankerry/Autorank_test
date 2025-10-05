@@ -41,4 +41,9 @@ return [
         'redirect' => env('GOOGLE_REDIRECT')
     ],
 
+    'google_cloud' => [
+    'key_file_path' => env('GOOGLE_CLOUD_KEY_FILE'), 
+    'project_id' => env('GOOGLE_PROJECT_ID'),
+    ],
+
 ];
